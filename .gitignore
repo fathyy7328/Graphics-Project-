@@ -1,0 +1,13 @@
+/build/
+/build_graphics_game/
+/CMakeFiles/
+/CMakeCache.txt
+/cmake-build-*/
+*.exe
+*.obj
+*.o
+*.a
+*.lib
+*.dll
+*.pdb
+compile_commands.json
