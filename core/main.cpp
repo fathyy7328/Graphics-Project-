@@ -2,13 +2,15 @@
 #include <GLFW/glfw3.h>
 #include "../Common.h"
 #include <iostream>
-#include "Game.h"
 
 GAME_STATE G_STATE = GAME_STATE::Main_Menu;
-
+bool escapeWasPressed = false;
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void processInput(GLFWwindow *window)
-;
+// void processInput(GLFWwindow *window);
+void Open_Cutscene(GLFWwindow* window);
+void Open_Playing(GLFWwindow* window);
+void Open_Pause(GLFWwindow* window);
+void Resume_Game(GLFWwindow* window);
 
 
 
@@ -148,11 +150,46 @@ int main()
     {
         // input
         // -----
-        processInput(window);
+        // processInput(window);
+        Open_Cutscene(window);
+        Open_Playing(window);
+        if (G_STATE == GAME_STATE::Playing)
+        {
+            Open_Pause(window);
+        }
+        else if (G_STATE == GAME_STATE::Paused)
+        {
+            Resume_Game(window);
+        }
+
+        escapeWasPressed = glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS;
 
         // render
         // ------
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        if (G_STATE == GAME_STATE::Main_Menu)
+        {
+            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        }
+        else if (G_STATE == GAME_STATE::Cutscene)
+        {
+            glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+        }
+        else if (G_STATE == GAME_STATE::Playing)
+        {
+            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        }
+        else if (G_STATE == GAME_STATE::Paused)
+        {
+            glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
+        }
+        else if (G_STATE == GAME_STATE::Win)
+        {
+            glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
+        }
+        else if (G_STATE == GAME_STATE::Lose)
+        {
+            glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+        }
         glClear(GL_COLOR_BUFFER_BIT);
 
         // draw our first triangle
@@ -183,12 +220,40 @@ int main()
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow *window)
-{
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
-}
+// void processInput(GLFWwindow *window)
+// {
+//     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+//         glfwSetWindowShouldClose(window, true);
+// }
 
+void Open_Cutscene(GLFWwindow *window)
+{
+    if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS && G_STATE == GAME_STATE::Main_Menu)
+    {
+        G_STATE = GAME_STATE::Cutscene;
+    }
+}
+void Open_Playing(GLFWwindow *window)
+{
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && G_STATE == GAME_STATE::Cutscene)
+    {
+        G_STATE = GAME_STATE::Playing;
+    }
+}
+void Open_Pause(GLFWwindow* window)
+{
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && !escapeWasPressed && G_STATE == GAME_STATE::Playing)
+    {
+        G_STATE = GAME_STATE::Paused;
+    }
+}
+void Resume_Game(GLFWwindow* window)
+{
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && !escapeWasPressed && G_STATE == GAME_STATE::Paused)
+    {
+        G_STATE = GAME_STATE::Playing;
+    }
+}
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)

@@ -2,6 +2,16 @@
 
 #include <array>
 
+// Shared top-level screen states used by the game modules.
+enum class GAME_STATE {
+    Main_Menu,
+    Cutscene,
+    Playing,
+    Paused,
+    Win,
+    Lose
+};
+
 // Shared first-pass layout values for the Garden Tower Defense game.
 // Positions use OpenGL normalized device coordinates: left/bottom = -1,
 // right/top = +1. Positive Y points upward.
