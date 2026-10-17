@@ -1,0 +1,152 @@
+#include <glad/gl.h>
+#include <iostream>
+#include <vector>
+#include "World.h"
+#include "../Common.h"
+
+GLuint laneVAO, laneVBO, laneShader;
+
+const int STRIPES_PER_LANE = 8;                  
+const int RECTS_PER_LANE = STRIPES_PER_LANE + 2; 
+const float EDGE_SIZE = 0.02f;                   
+const float SOIL[3]        = {0.45f, 0.30f, 0.18f};
+const float LIGHT_GRASS[3] = {0.42f, 0.72f, 0.26f};
+const float DARK_GRASS[3]  = {0.33f, 0.61f, 0.20f};
+const float GRASS_EDGE[3]  = {0.20f, 0.42f, 0.12f};
+const char* laneVertexShaderSource = R"(
+#version 330 core
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aColor;
+out vec3 vColor;
+void main()
+{
+    gl_Position = vec4(aPos, 1.0);
+    vColor = aColor;
+}
+)";
+
+const char* laneFragmentShaderSource = R"(
+#version 330 core
+in vec3 vColor;
+out vec4 FragColor;
+void main()
+{
+    FragColor = vec4(vColor, 1.0);
+}
+)";
+
+GLuint compileLaneShader(GLenum type, const char* source)
+{
+    GLuint shader = glCreateShader(type);
+    glShaderSource(shader, 1, &source, nullptr);
+    glCompileShader(shader);
+    int success;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    if (!success)
+    {
+        char infoLog[512];
+        glGetShaderInfoLog(shader, 512, nullptr, infoLog);
+        std::cout << "Lane shader compile error:\n" << infoLog << std::endl;
+    }
+    return shader;
+}
+
+void createLaneShader()
+{
+    GLuint vertexShader = compileLaneShader(GL_VERTEX_SHADER, laneVertexShaderSource);
+    GLuint fragmentShader = compileLaneShader(GL_FRAGMENT_SHADER, laneFragmentShaderSource);
+    laneShader = glCreateProgram();
+    glAttachShader(laneShader, vertexShader);
+    glAttachShader(laneShader, fragmentShader);
+    glLinkProgram(laneShader);
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+}
+
+void addRect(std::vector<float>& v, float left, float bottom, float right, float top, const float color[3])
+{
+    float corners[6][2] = {
+        {left, bottom}, {right, bottom}, {right, top}, // first triangle
+        {left, bottom}, {right, top},    {left, top}   // second triangle
+    };
+
+    for (int i = 0; i < 6; i++)
+    {
+        v.push_back(corners[i][0]);
+        v.push_back(corners[i][1]);
+        v.push_back(0.0f);
+        v.push_back(color[0]);
+        v.push_back(color[1]);
+        v.push_back(color[2]);
+    }
+}
+
+void createLanes()
+{
+    createLaneShader();
+
+    std::vector<float> vertices;
+    float soilTop = GameConfig::LANE_CENTER_Y[0] + GameConfig::LANE_HALF_HEIGHT + 0.04f;
+    float soilBottom = GameConfig::LANE_CENTER_Y[GameConfig::LANE_COUNT - 1] - GameConfig::LANE_HALF_HEIGHT - 0.04f;
+    addRect(vertices, GameConfig::PLAYFIELD_LEFT, soilBottom, GameConfig::PLAYFIELD_RIGHT, soilTop, SOIL);
+
+    for (int i = 0; i < GameConfig::LANE_COUNT; i++)
+    {
+        float left = GameConfig::PLAYFIELD_LEFT;
+        float right = GameConfig::PLAYFIELD_RIGHT;
+        float bottom = GameConfig::LANE_CENTER_Y[i] - GameConfig::LANE_HALF_HEIGHT;
+        float top = GameConfig::LANE_CENTER_Y[i] + GameConfig::LANE_HALF_HEIGHT;
+        float stripeWidth = (right - left) / STRIPES_PER_LANE;
+        for (int s = 0; s < STRIPES_PER_LANE; s++)
+        {
+            float x1 = left + s * stripeWidth;
+            float x2 = x1 + stripeWidth;
+            if (s % 2 == 0)
+                addRect(vertices, x1, bottom, x2, top, LIGHT_GRASS);
+            else
+                addRect(vertices, x1, bottom, x2, top, DARK_GRASS);
+        }
+
+        addRect(vertices, left, bottom, right, bottom + EDGE_SIZE, GRASS_EDGE);
+        addRect(vertices, left, top - EDGE_SIZE, right, top, GRASS_EDGE);
+    }
+
+    glGenVertexArrays(1, &laneVAO);
+    glGenBuffers(1, &laneVBO);
+    glBindVertexArray(laneVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, laneVBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+void drawLane(int i)
+{
+    glUseProgram(laneShader);
+    glBindVertexArray(laneVAO);
+    int firstVertex = 6 + i * RECTS_PER_LANE * 6;
+    glDrawArrays(GL_TRIANGLES, firstVertex, RECTS_PER_LANE * 6);
+}
+
+void drawLanes()
+{
+    glUseProgram(laneShader);
+    glBindVertexArray(laneVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6); //soil
+
+    for (int i = 0; i < GameConfig::LANE_COUNT; i++)
+    {
+        drawLane(i);
+    }
+}
+
+void deleteLanes()
+{
+    glDeleteVertexArrays(1, &laneVAO);
+    glDeleteBuffers(1, &laneVBO);
+    glDeleteProgram(laneShader);
+}
