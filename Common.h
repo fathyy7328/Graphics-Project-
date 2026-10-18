@@ -41,3 +41,9 @@ inline constexpr float PLAYER_START_X = -0.36f;
 inline constexpr float ENEMY_SPAWN_X = 0.90f;
 
 } // namespace GameConfig
+
+// Shared functions used by more than one member.
+
+// Member 2 (world/World.cpp): draws a health bar centered at (x, y).
+// Call it after drawing the character so the bar shows on top.
+void drawHealthBar(float x, float y, int hp, int maxHp);
