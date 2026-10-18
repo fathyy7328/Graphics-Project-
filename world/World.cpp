@@ -150,3 +150,97 @@ void deleteLanes()
     glDeleteBuffers(1, &laneVBO);
     glDeleteProgram(laneShader);
 }
+
+// ---------------- Health bar ----------------
+
+GLuint barVAO, barVBO, barShader;
+const float BAR_WIDTH = 0.12f;
+const float BAR_HEIGHT = 0.02f;
+const float BAR_BACKGROUND[3] = {0.15f, 0.15f, 0.15f};
+const float BAR_GREEN[3]      = {0.20f, 0.80f, 0.20f};
+const float BAR_YELLOW[3]     = {0.95f, 0.80f, 0.10f};
+const float BAR_RED[3]        = {0.85f, 0.15f, 0.15f};
+const char* barVertexShaderSource = R"(
+#version 330 core
+layout (location = 0) in vec3 aPos;
+uniform vec2 u_Position;
+uniform vec2 u_Size;
+void main()
+{
+    gl_Position = vec4(aPos.x * u_Size.x + u_Position.x, aPos.y * u_Size.y + u_Position.y, 0.0, 1.0);
+}
+)";
+
+const char* barFragmentShaderSource = R"(
+#version 330 core
+uniform vec3 u_Color;
+out vec4 FragColor;
+void main()
+{
+    FragColor = vec4(u_Color, 1.0);
+}
+)";
+
+void createHealthBar()
+{
+    GLuint vertexShader = compileLaneShader(GL_VERTEX_SHADER, barVertexShaderSource);
+    GLuint fragmentShader = compileLaneShader(GL_FRAGMENT_SHADER, barFragmentShaderSource);
+    barShader = glCreateProgram();
+    glAttachShader(barShader, vertexShader);
+    glAttachShader(barShader, fragmentShader);
+    glLinkProgram(barShader);
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+    float vertices[] = {
+        // first triangle
+        0.0f, 0.0f, 0.0f, // bottom left
+        1.0f, 0.0f, 0.0f, // bottom right
+        1.0f, 1.0f, 0.0f, // top right
+        // second triangle
+        0.0f, 0.0f, 0.0f, // bottom left
+        1.0f, 1.0f, 0.0f, // top right
+        0.0f, 1.0f, 0.0f  // top left
+    };
+    glGenVertexArrays(1, &barVAO);
+    glGenBuffers(1, &barVBO);
+    glBindVertexArray(barVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, barVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+// x, y is the center of the bar
+void drawHealthBar(float x, float y, int hp, int maxHp)
+{
+    if (hp < 0)
+        hp = 0;
+    float percent = (float)hp / maxHp;
+    float left = x - BAR_WIDTH / 2;
+    float bottom = y - BAR_HEIGHT / 2;
+    glUseProgram(barShader);
+    glBindVertexArray(barVAO);
+    GLint positionLoc = glGetUniformLocation(barShader, "u_Position");
+    GLint sizeLoc = glGetUniformLocation(barShader, "u_Size");
+    GLint colorLoc = glGetUniformLocation(barShader, "u_Color");
+    // background bar (full width)
+    glUniform2f(positionLoc, left, bottom);
+    glUniform2f(sizeLoc, BAR_WIDTH, BAR_HEIGHT);
+    glUniform3f(colorLoc, BAR_BACKGROUND[0], BAR_BACKGROUND[1], BAR_BACKGROUND[2]);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    if (percent > 0.6f)
+        glUniform3f(colorLoc, BAR_GREEN[0], BAR_GREEN[1], BAR_GREEN[2]);
+    else if (percent > 0.3f)
+        glUniform3f(colorLoc, BAR_YELLOW[0], BAR_YELLOW[1], BAR_YELLOW[2]);
+    else
+        glUniform3f(colorLoc, BAR_RED[0], BAR_RED[1], BAR_RED[2]);
+    glUniform2f(sizeLoc, BAR_WIDTH * percent, BAR_HEIGHT);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+void deleteHealthBar()
+{
+    glDeleteVertexArrays(1, &barVAO);
+    glDeleteBuffers(1, &barVBO);
+    glDeleteProgram(barShader);
+}
