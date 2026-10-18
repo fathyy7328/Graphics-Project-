@@ -1,9 +1,13 @@
 #pragma once
+#include <glad/gl.h>
+#include <GLFW/glfw3.h>
 
-void createLanes();     
-void drawLane(int i);   
-void drawLanes();       
+void createLanes();
+void drawLane(int i);
+void drawLanes();
 void deleteLanes();
+void updateLanes(GLFWwindow* window);
+bool isLaneSelected(int lane);
 void createHealthBar();
 void drawHealthBar(float x, float y, int hp, int maxHp);
 void deleteHealthBar();

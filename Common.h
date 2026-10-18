@@ -12,6 +12,9 @@ enum class GAME_STATE {
     Lose
 };
 
+// The current screen. Member 1 creates it in core/main.cpp; other modules can read it.
+extern GAME_STATE G_STATE;
+
 // Shared first-pass layout values for the Garden Tower Defense game.
 // Positions use OpenGL normalized device coordinates: left/bottom = -1,
 // right/top = +1. Positive Y points upward.

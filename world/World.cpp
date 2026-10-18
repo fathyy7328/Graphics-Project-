@@ -13,6 +13,12 @@ const float SOIL[3]        = {0.45f, 0.30f, 0.18f};
 const float LIGHT_GRASS[3] = {0.42f, 0.72f, 0.26f};
 const float DARK_GRASS[3]  = {0.33f, 0.61f, 0.20f};
 const float GRASS_EDGE[3]  = {0.20f, 0.42f, 0.12f};
+// hover and selection
+int hoveredLane = -1;
+bool laneSelected[GameConfig::LANE_COUNT] = {false};
+bool mouseWasPressed = false;
+const float HOVER_HIGHLIGHT = 0.2f;
+const float SELECTED_HIGHLIGHT = 0.45f;
 const char* laneVertexShaderSource = R"(
 #version 330 core
 layout (location = 0) in vec3 aPos;
@@ -29,9 +35,10 @@ const char* laneFragmentShaderSource = R"(
 #version 330 core
 in vec3 vColor;
 out vec4 FragColor;
+uniform float u_Highlight; 
 void main()
 {
-    FragColor = vec4(vColor, 1.0);
+    FragColor = vec4(mix(vColor, vec3(1.0), u_Highlight), 1.0);
 }
 )";
 
@@ -128,6 +135,13 @@ void drawLane(int i)
 {
     glUseProgram(laneShader);
     glBindVertexArray(laneVAO);
+    float highlight = 0.0f;
+    if (laneSelected[i])
+        highlight = SELECTED_HIGHLIGHT;
+    else if (hoveredLane == i)
+        highlight = HOVER_HIGHLIGHT;
+    GLint highlightLoc = glGetUniformLocation(laneShader, "u_Highlight");
+    glUniform1f(highlightLoc, highlight);
     int firstVertex = 6 + i * RECTS_PER_LANE * 6;
     glDrawArrays(GL_TRIANGLES, firstVertex, RECTS_PER_LANE * 6);
 }
@@ -136,7 +150,9 @@ void drawLanes()
 {
     glUseProgram(laneShader);
     glBindVertexArray(laneVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6); //soil
+    GLint highlightLoc = glGetUniformLocation(laneShader, "u_Highlight");
+    glUniform1f(highlightLoc, 0.0f);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
 
     for (int i = 0; i < GameConfig::LANE_COUNT; i++)
     {
@@ -149,6 +165,45 @@ void deleteLanes()
     glDeleteVertexArrays(1, &laneVAO);
     glDeleteBuffers(1, &laneVBO);
     glDeleteProgram(laneShader);
+}
+
+void updateLanes(GLFWwindow* window)
+{
+    bool pressed = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+    if (G_STATE != GAME_STATE::Playing)
+    {
+        hoveredLane = -1;
+        mouseWasPressed = pressed;
+        return;
+    }
+    double mouseX, mouseY;
+    glfwGetCursorPos(window, &mouseX, &mouseY);
+    int width, height;
+    glfwGetWindowSize(window, &width, &height);
+    float x = (float)mouseX / (width / 2.0f) - 1.0f;
+    float y = 1.0f - (float)mouseY / (height / 2.0f);
+    hoveredLane = -1;
+    if (x >= GameConfig::PLAYFIELD_LEFT && x <= GameConfig::PLAYFIELD_RIGHT)
+    {
+        for (int i = 0; i < GameConfig::LANE_COUNT; i++)
+        {
+            float distance = y - GameConfig::LANE_CENTER_Y[i];
+            if (distance < 0)
+                distance = -distance;
+            if (distance <= GameConfig::LANE_HALF_HEIGHT)
+                hoveredLane = i;
+        }
+    }
+    if (pressed && !mouseWasPressed && hoveredLane != -1)
+        laneSelected[hoveredLane] = !laneSelected[hoveredLane];
+    mouseWasPressed = pressed;
+}
+
+bool isLaneSelected(int lane)
+{
+    if (lane < 0 || lane >= GameConfig::LANE_COUNT)
+        return false;
+    return laneSelected[lane];
 }
 
 // ---------------- Health bar ----------------
