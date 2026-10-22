@@ -299,3 +299,31 @@ void deleteHealthBar()
     glDeleteBuffers(1, &barVBO);
     glDeleteProgram(barShader);
 }
+
+// ---------------- Coins ----------------
+
+int coins = GameConfig::STARTING_COINS;
+void addCoins(int n)
+{
+    if (n <= 0)
+        return;
+    coins += n;
+    std::cout << "Coins: " << coins << std::endl;
+}
+int getCoins()
+{
+    return coins;
+}
+// returns true if the player had enough coins and they were taken
+bool spendCoins(int n)
+{
+    if (coins < n)
+        return false;
+    coins -= n;
+    std::cout << "Coins: " << coins << std::endl;
+    return true;
+}
+void resetCoins()
+{
+    coins = GameConfig::STARTING_COINS;
+}

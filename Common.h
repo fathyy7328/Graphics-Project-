@@ -43,10 +43,15 @@ inline constexpr float TROPHY_CENTER_Y = 0.0f;
 inline constexpr float PLAYER_START_X = -0.36f;
 inline constexpr float ENEMY_SPAWN_X = 0.90f;
 
-} // namespace GameConfig
+inline constexpr int MELEE_COST = 10;
+inline constexpr int RANGED_COST = 20;
+inline constexpr int DEFENSE_COST = 30;
+inline constexpr int STARTING_COINS = 30;
+inline constexpr int COIN_VALUE = 5; // coins given by one collectible
 
-// Shared functions used by more than one member.
-
-// Member 2 (world/World.cpp): draws a health bar centered at (x, y).
+} 
 // Call it after drawing the character so the bar shows on top.
 void drawHealthBar(float x, float y, int hp, int maxHp);
+
+// Member 3 calls addCoins(GameConfig::COIN_VALUE) when a player picks up a collectible.
+void addCoins(int n);

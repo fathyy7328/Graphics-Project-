@@ -11,3 +11,7 @@ bool isLaneSelected(int lane);
 void createHealthBar();
 void drawHealthBar(float x, float y, int hp, int maxHp);
 void deleteHealthBar();
+void addCoins(int n);
+int getCoins();
+bool spendCoins(int n);
+void resetCoins();
