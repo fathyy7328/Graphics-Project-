@@ -15,3 +15,6 @@ void addCoins(int n);
 int getCoins();
 bool spendCoins(int n);
 void resetCoins();
+void createBackground();
+void drawBackground();
+void deleteBackground();

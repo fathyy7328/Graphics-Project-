@@ -327,3 +327,91 @@ void resetCoins()
 {
     coins = GameConfig::STARTING_COINS;
 }
+
+// ---------------- Background ----------------
+
+GLuint bgVAO, bgVBO;
+int bgVertexCount = 0;
+const float WOOD[3]         = {0.50f, 0.32f, 0.17f};
+const float WOOD_DARK[3]    = {0.33f, 0.20f, 0.10f};
+const float WOOD_LIGHT[3]   = {0.65f, 0.45f, 0.26f};
+const float STONE_GAP[3]    = {0.45f, 0.44f, 0.42f};
+const float STONE_LIGHT[3]  = {0.78f, 0.76f, 0.72f};
+const float STONE_DARK[3]   = {0.70f, 0.68f, 0.64f};
+const float GROUND_GRASS[3] = {0.30f, 0.55f, 0.18f};
+const float HEDGE[3]        = {0.13f, 0.33f, 0.10f};
+const float HEDGE_LIGHT[3]  = {0.20f, 0.45f, 0.15f};
+
+// call after createLanes() because it uses the lane shader
+void createBackground()
+{
+    std::vector<float> vertices;
+    float playTop = GameConfig::LANE_CENTER_Y[0] + GameConfig::LANE_HALF_HEIGHT + 0.04f;
+    float playBottom = GameConfig::LANE_CENTER_Y[GameConfig::LANE_COUNT - 1] - GameConfig::LANE_HALF_HEIGHT - 0.04f;
+    // 1. wooden bar at the top: 3 long planks with a dark line between them
+    addRect(vertices, -1.0f, playTop, 1.0f, 1.0f, WOOD);
+    float plankHeight = (1.0f - playTop) / 3;
+    addRect(vertices, -1.0f, playTop + plankHeight, 1.0f, playTop + plankHeight + 0.006f, WOOD_DARK);
+    addRect(vertices, -1.0f, playTop + 2 * plankHeight, 1.0f, playTop + 2 * plankHeight + 0.006f, WOOD_DARK);
+    addRect(vertices, -1.0f, playTop, 1.0f, playTop + 0.012f, WOOD_LIGHT); // light edge at the bottom of the bar
+    // 2. grass ground at the bottom
+    addRect(vertices, -1.0f, -1.0f, 1.0f, playBottom, GROUND_GRASS);
+    addRect(vertices, -1.0f, playBottom - 0.02f, 1.0f, playBottom, GRASS_EDGE);
+    // 3. stone patio for the home base (dark gaps first, then the tiles on top)
+    float patioLeft = GameConfig::HOME_BASE_LEFT;
+    float patioRight = GameConfig::HOME_BASE_RIGHT;
+    addRect(vertices, patioLeft, playBottom, patioRight, playTop, STONE_GAP);
+    int columns = 4;
+    int rows = 12;
+    float tileWidth = (patioRight - patioLeft) / columns;
+    float tileHeight = (playTop - playBottom) / rows;
+    float gap = 0.008f;
+    for (int r = 0; r < rows; r++)
+    {
+        for (int c = 0; c < columns; c++)
+        {
+            float x1 = patioLeft + c * tileWidth + gap;
+            float x2 = patioLeft + (c + 1) * tileWidth - gap;
+            float y1 = playBottom + r * tileHeight + gap;
+            float y2 = playBottom + (r + 1) * tileHeight - gap;
+            if ((r + c) % 2 == 0)
+                addRect(vertices, x1, y1, x2, y2, STONE_LIGHT);
+            else
+                addRect(vertices, x1, y1, x2, y2, STONE_DARK);
+        }
+    }
+
+    // 4. hedge between the patio and the lanes
+    addRect(vertices, GameConfig::HOME_BASE_RIGHT, playBottom, GameConfig::PLAYFIELD_LEFT, playTop, HEDGE);
+    addRect(vertices, GameConfig::HOME_BASE_RIGHT + 0.01f, playBottom, GameConfig::PLAYFIELD_LEFT - 0.01f, playTop, HEDGE_LIGHT);
+
+    bgVertexCount = vertices.size() / 6; // 6 numbers per vertex (x, y, z, r, g, b)
+    glGenVertexArrays(1, &bgVAO);
+    glGenBuffers(1, &bgVBO);
+    glBindVertexArray(bgVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, bgVBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    // color (location 1)
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+// draw this first, before the lanes, so everything else is on top of it
+void drawBackground()
+{
+    glUseProgram(laneShader);
+    glBindVertexArray(bgVAO);
+    GLint highlightLoc = glGetUniformLocation(laneShader, "u_Highlight");
+    glUniform1f(highlightLoc, 0.0f);
+    glDrawArrays(GL_TRIANGLES, 0, bgVertexCount);
+}
+void deleteBackground()
+{
+    glDeleteVertexArrays(1, &bgVAO);
+    glDeleteBuffers(1, &bgVBO);
+}
