@@ -437,16 +437,15 @@ const float LAMP_GLOW[3]     = {1.00f, 0.92f, 0.45f};
 void addCircle(std::vector<float>& v, float cx, float cy, float radius, const float color[3])
 {
     int slices = 20;
-    // the window is wider than it is tall, so make x smaller or the circle looks like an oval
     float radiusX = radius * (float)GameConfig::WINDOW_HEIGHT / GameConfig::WINDOW_WIDTH;
     for (int i = 0; i < slices; i++)
     {
         float angle1 = 2.0f * 3.14159f * i / slices;
         float angle2 = 2.0f * 3.14159f * (i + 1) / slices;
         float corners[3][2] = {
-            {cx, cy},                                                    // center
-            {cx + radiusX * cos(angle1), cy + radius * sin(angle1)},     // edge point 1
-            {cx + radiusX * cos(angle2), cy + radius * sin(angle2)}      // edge point 2
+            {cx, cy},                                                    
+            {cx + radiusX * cos(angle1), cy + radius * sin(angle1)},     
+            {cx + radiusX * cos(angle2), cy + radius * sin(angle2)}      
         };
         for (int j = 0; j < 3; j++)
         {
@@ -481,23 +480,21 @@ void createDecorations()
         addCircle(vertices, x, GROUND_Y + 0.06f, 0.045f, BUSH_LIGHT);
     }
     float benchX = -0.15f;
-    addRect(vertices, benchX - 0.08f, GROUND_Y, benchX - 0.065f, GROUND_Y + 0.05f, WOOD_DARK); // left leg
-    addRect(vertices, benchX + 0.065f, GROUND_Y, benchX + 0.08f, GROUND_Y + 0.05f, WOOD_DARK); // right leg
-    addRect(vertices, benchX - 0.1f, GROUND_Y + 0.05f, benchX + 0.1f, GROUND_Y + 0.065f, WOOD); // seat
-    addRect(vertices, benchX - 0.085f, GROUND_Y + 0.065f, benchX - 0.075f, GROUND_Y + 0.1f, WOOD_DARK); // back support
-    addRect(vertices, benchX + 0.075f, GROUND_Y + 0.065f, benchX + 0.085f, GROUND_Y + 0.1f, WOOD_DARK); // back support
-    addRect(vertices, benchX - 0.1f, GROUND_Y + 0.085f, benchX + 0.1f, GROUND_Y + 0.11f, WOOD); // backrest
+    addRect(vertices, benchX - 0.08f, GROUND_Y, benchX - 0.065f, GROUND_Y + 0.05f, WOOD_DARK); 
+    addRect(vertices, benchX + 0.065f, GROUND_Y, benchX + 0.08f, GROUND_Y + 0.05f, WOOD_DARK); 
+    addRect(vertices, benchX - 0.1f, GROUND_Y + 0.05f, benchX + 0.1f, GROUND_Y + 0.065f, WOOD); 
+    addRect(vertices, benchX - 0.085f, GROUND_Y + 0.065f, benchX - 0.075f, GROUND_Y + 0.1f, WOOD_DARK); 
+    addRect(vertices, benchX + 0.075f, GROUND_Y + 0.065f, benchX + 0.085f, GROUND_Y + 0.1f, WOOD_DARK); 
+    addRect(vertices, benchX - 0.1f, GROUND_Y + 0.085f, benchX + 0.1f, GROUND_Y + 0.11f, WOOD); 
     float lampX = 0.3f;
-    addRect(vertices, lampX - 0.02f, GROUND_Y, lampX + 0.02f, GROUND_Y + 0.02f, METAL); // base
-    addRect(vertices, lampX - 0.006f, GROUND_Y, lampX + 0.006f, GROUND_Y + 0.17f, METAL); // pole
-    addRect(vertices, lampX - 0.022f, GROUND_Y + 0.16f, lampX + 0.022f, GROUND_Y + 0.21f, METAL); // lamp box
-    addCircle(vertices, lampX, GROUND_Y + 0.185f, 0.017f, LAMP_GLOW); // light
+    addRect(vertices, lampX - 0.02f, GROUND_Y, lampX + 0.02f, GROUND_Y + 0.02f, METAL); 
+    addRect(vertices, lampX - 0.006f, GROUND_Y, lampX + 0.006f, GROUND_Y + 0.17f, METAL); 
+    addRect(vertices, lampX - 0.022f, GROUND_Y + 0.16f, lampX + 0.022f, GROUND_Y + 0.21f, METAL); 
+    addCircle(vertices, lampX, GROUND_Y + 0.185f, 0.017f, LAMP_GLOW); 
 
     // 5. flowers: stem + 4 petals + yellow center
-    // first collect where the flowers go, then draw them all in one loop
     std::vector<float> flowerX;
     std::vector<float> flowerY;
-
     // some along each soil path between two lanes
     for (int p = 0; p < GameConfig::LANE_COUNT - 1; p++)
     {
@@ -515,10 +512,8 @@ void createDecorations()
     {
         float x = flowerX[i];
         float y = flowerY[i];
-        float petal = 0.013f; // how far each petal is from the center
-
+        float petal = 0.013f; 
         addRect(vertices, x - 0.003f, y - 0.05f, x + 0.003f, y, STEM);
-
         addCircle(vertices, x - petal, y, 0.012f, PETAL_RED);
         addCircle(vertices, x + petal, y, 0.012f, PETAL_RED);
         addCircle(vertices, x, y - petal, 0.012f, PETAL_RED);
@@ -559,4 +554,85 @@ void deleteDecorations()
 {
     glDeleteVertexArrays(1, &decoVAO);
     glDeleteBuffers(1, &decoVBO);
+}
+
+// ---------------- Home base ----------------
+
+GLuint homeVAO, homeVBO;
+int homeVertexCount = 0;
+const float MARBLE[3]    = {0.90f, 0.90f, 0.87f};
+const float GOLD[3]      = {0.90f, 0.72f, 0.20f};
+const float GOLD_DARK[3] = {0.72f, 0.55f, 0.12f};
+const float PURPLE[3]    = {0.40f, 0.18f, 0.55f};
+const float BANNER[3]    = {0.97f, 0.97f, 0.95f};
+
+// call after createLanes() because it uses the lane shader
+void createHomeBase()
+{
+    std::vector<float> vertices;
+    float cx = GameConfig::TROPHY_CENTER_X;
+    float cy = GameConfig::TROPHY_CENTER_Y;
+
+    // 1. podium: 3 marble steps, each with a gold line on top (bottom step is the widest)
+    addRect(vertices, cx - 0.19f, cy - 0.35f, cx + 0.19f, cy - 0.29f, MARBLE);
+    addRect(vertices, cx - 0.19f, cy - 0.29f, cx + 0.19f, cy - 0.282f, GOLD);
+    addRect(vertices, cx - 0.15f, cy - 0.282f, cx + 0.15f, cy - 0.222f, MARBLE);
+    addRect(vertices, cx - 0.15f, cy - 0.222f, cx + 0.15f, cy - 0.214f, GOLD);
+    addRect(vertices, cx - 0.11f, cy - 0.214f, cx + 0.11f, cy - 0.154f, MARBLE);
+    addRect(vertices, cx - 0.11f, cy - 0.154f, cx + 0.11f, cy - 0.146f, GOLD);
+
+    // 2. banner behind the trophy: purple border, then gold border, then white inside
+    addRect(vertices, cx - 0.13f, cy - 0.146f, cx + 0.13f, cy + 0.26f, PURPLE);
+    addRect(vertices, cx - 0.12f, cy - 0.136f, cx + 0.12f, cy + 0.25f, GOLD);
+    addRect(vertices, cx - 0.11f, cy - 0.126f, cx + 0.11f, cy + 0.24f, BANNER);
+
+    // 3. trophy handles: a gold circle with a smaller banner colored circle inside makes a ring
+    addCircle(vertices, cx - 0.075f, cy + 0.10f, 0.045f, GOLD);
+    addCircle(vertices, cx - 0.075f, cy + 0.10f, 0.028f, BANNER);
+    addCircle(vertices, cx + 0.075f, cy + 0.10f, 0.045f, GOLD);
+    addCircle(vertices, cx + 0.075f, cy + 0.10f, 0.028f, BANNER);
+
+    // 4. trophy cup: a gold circle, then the top of it is covered so only the round bottom is left
+    addCircle(vertices, cx, cy + 0.10f, 0.09f, GOLD);
+    addRect(vertices, cx - 0.07f, cy + 0.13f, cx + 0.07f, cy + 0.19f, BANNER);
+    addRect(vertices, cx - 0.075f, cy + 0.125f, cx + 0.075f, cy + 0.14f, GOLD_DARK); // rim
+
+    // 5. stem and base
+    addRect(vertices, cx - 0.012f, cy - 0.096f, cx + 0.012f, cy + 0.02f, GOLD);       // stem
+    addRect(vertices, cx - 0.035f, cy - 0.116f, cx + 0.035f, cy - 0.096f, GOLD);      // base top
+    addRect(vertices, cx - 0.05f, cy - 0.146f, cx + 0.05f, cy - 0.116f, GOLD_DARK);   // base bottom
+
+    homeVertexCount = vertices.size() / 6;
+
+    glGenVertexArrays(1, &homeVAO);
+    glGenBuffers(1, &homeVBO);
+    glBindVertexArray(homeVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, homeVBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+
+    // position (location 0)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    // color (location 1)
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+// draw after drawBackground() so it sits on the patio
+void drawHomeBase()
+{
+    glUseProgram(laneShader);
+    glBindVertexArray(homeVAO);
+    GLint highlightLoc = glGetUniformLocation(laneShader, "u_Highlight");
+    glUniform1f(highlightLoc, 0.0f);
+    glDrawArrays(GL_TRIANGLES, 0, homeVertexCount);
+}
+
+void deleteHomeBase()
+{
+    glDeleteVertexArrays(1, &homeVAO);
+    glDeleteBuffers(1, &homeVBO);
 }

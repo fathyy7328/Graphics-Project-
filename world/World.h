@@ -21,3 +21,6 @@ void deleteBackground();
 void createDecorations();
 void drawDecorations();
 void deleteDecorations();
+void createHomeBase();
+void drawHomeBase();
+void deleteHomeBase();

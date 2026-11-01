@@ -50,8 +50,12 @@ inline constexpr int STARTING_COINS = 30;
 inline constexpr int COIN_VALUE = 5; // coins given by one collectible
 
 } 
-// Call it after drawing the character so the bar shows on top.
+// call it after drawing the character so the bar shows on top
 void drawHealthBar(float x, float y, int hp, int maxHp);
 
 // Member 3 calls addCoins(GameConfig::COIN_VALUE) when a player picks up a collectible.
 void addCoins(int n);
+
+void drawBackground(); //use in cutscene
+void drawDecorations(); //use in cutscene
+void drawHomeBase(); //use in cutscene
