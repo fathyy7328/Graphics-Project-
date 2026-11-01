@@ -59,3 +59,6 @@ void addCoins(int n);
 void drawBackground(); //use in cutscene
 void drawDecorations(); //use in cutscene
 void drawHomeBase(); //use in cutscene
+
+// call to restart, coins go back to the start and no lane is selected.
+void worldReset();

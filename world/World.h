@@ -24,3 +24,4 @@ void deleteDecorations();
 void createHomeBase();
 void drawHomeBase();
 void deleteHomeBase();
+void worldReset();

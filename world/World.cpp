@@ -329,6 +329,19 @@ void resetCoins()
     coins = GameConfig::STARTING_COINS;
 }
 
+// ---------------- Reset ----------------
+
+// call on Restart: puts everything in world back to how it was at the start
+void worldReset()
+{
+    resetCoins();
+    for (int i = 0; i < GameConfig::LANE_COUNT; i++)
+    {
+        laneSelected[i] = false;
+    }
+    hoveredLane = -1;
+}
+
 // ---------------- Background ----------------
 
 GLuint bgVAO, bgVBO;
