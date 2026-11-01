@@ -18,3 +18,6 @@ void resetCoins();
 void createBackground();
 void drawBackground();
 void deleteBackground();
+void createDecorations();
+void drawDecorations();
+void deleteDecorations();

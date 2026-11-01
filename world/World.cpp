@@ -1,6 +1,7 @@
 #include <glad/gl.h>
 #include <iostream>
 #include <vector>
+#include <cmath>
 #include "World.h"
 #include "../Common.h"
 
@@ -414,4 +415,148 @@ void deleteBackground()
 {
     glDeleteVertexArrays(1, &bgVAO);
     glDeleteBuffers(1, &bgVBO);
+}
+
+// ---------------- Decorations ----------------
+
+GLuint decoVAO, decoVBO;
+int decoVertexCount = 0;
+
+const float GROUND_Y = -0.97f; // where things stand in the grass strip at the bottom
+const float TRUNK[3]         = {0.40f, 0.25f, 0.12f};
+const float LEAVES[3]        = {0.16f, 0.48f, 0.14f};
+const float LEAVES_LIGHT[3]  = {0.25f, 0.60f, 0.20f};
+const float BUSH[3]          = {0.10f, 0.36f, 0.12f};
+const float BUSH_LIGHT[3]    = {0.16f, 0.46f, 0.16f};
+const float STEM[3]          = {0.15f, 0.45f, 0.12f};
+const float PETAL_RED[3]     = {0.85f, 0.15f, 0.20f};
+const float FLOWER_CENTER[3] = {0.98f, 0.85f, 0.20f};
+const float METAL[3]         = {0.20f, 0.20f, 0.22f};
+const float LAMP_GLOW[3]     = {1.00f, 0.92f, 0.45f};
+
+void addCircle(std::vector<float>& v, float cx, float cy, float radius, const float color[3])
+{
+    int slices = 20;
+    // the window is wider than it is tall, so make x smaller or the circle looks like an oval
+    float radiusX = radius * (float)GameConfig::WINDOW_HEIGHT / GameConfig::WINDOW_WIDTH;
+    for (int i = 0; i < slices; i++)
+    {
+        float angle1 = 2.0f * 3.14159f * i / slices;
+        float angle2 = 2.0f * 3.14159f * (i + 1) / slices;
+        float corners[3][2] = {
+            {cx, cy},                                                    // center
+            {cx + radiusX * cos(angle1), cy + radius * sin(angle1)},     // edge point 1
+            {cx + radiusX * cos(angle2), cy + radius * sin(angle2)}      // edge point 2
+        };
+        for (int j = 0; j < 3; j++)
+        {
+            v.push_back(corners[j][0]);
+            v.push_back(corners[j][1]);
+            v.push_back(0.0f);
+            v.push_back(color[0]);
+            v.push_back(color[1]);
+            v.push_back(color[2]);
+        }
+    }
+}
+// call after createLanes() because it uses the lane shader
+void createDecorations()
+{
+    std::vector<float> vertices;
+    float treeX[] = {-0.85f, 0.88f};
+    for (int i = 0; i < 2; i++)
+    {
+        float x = treeX[i];
+        addRect(vertices, x - 0.02f, GROUND_Y, x + 0.02f, GROUND_Y + 0.09f, TRUNK);
+        addCircle(vertices, x - 0.04f, GROUND_Y + 0.12f, 0.06f, LEAVES);
+        addCircle(vertices, x + 0.04f, GROUND_Y + 0.12f, 0.06f, LEAVES);
+        addCircle(vertices, x, GROUND_Y + 0.16f, 0.06f, LEAVES_LIGHT);
+    }
+    float bushX[] = {-0.6f, 0.1f, 0.68f};
+    for (int i = 0; i < 3; i++)
+    {
+        float x = bushX[i];
+        addCircle(vertices, x - 0.04f, GROUND_Y + 0.03f, 0.045f, BUSH);
+        addCircle(vertices, x + 0.04f, GROUND_Y + 0.03f, 0.045f, BUSH);
+        addCircle(vertices, x, GROUND_Y + 0.06f, 0.045f, BUSH_LIGHT);
+    }
+    float benchX = -0.15f;
+    addRect(vertices, benchX - 0.08f, GROUND_Y, benchX - 0.065f, GROUND_Y + 0.05f, WOOD_DARK); // left leg
+    addRect(vertices, benchX + 0.065f, GROUND_Y, benchX + 0.08f, GROUND_Y + 0.05f, WOOD_DARK); // right leg
+    addRect(vertices, benchX - 0.1f, GROUND_Y + 0.05f, benchX + 0.1f, GROUND_Y + 0.065f, WOOD); // seat
+    addRect(vertices, benchX - 0.085f, GROUND_Y + 0.065f, benchX - 0.075f, GROUND_Y + 0.1f, WOOD_DARK); // back support
+    addRect(vertices, benchX + 0.075f, GROUND_Y + 0.065f, benchX + 0.085f, GROUND_Y + 0.1f, WOOD_DARK); // back support
+    addRect(vertices, benchX - 0.1f, GROUND_Y + 0.085f, benchX + 0.1f, GROUND_Y + 0.11f, WOOD); // backrest
+    float lampX = 0.3f;
+    addRect(vertices, lampX - 0.02f, GROUND_Y, lampX + 0.02f, GROUND_Y + 0.02f, METAL); // base
+    addRect(vertices, lampX - 0.006f, GROUND_Y, lampX + 0.006f, GROUND_Y + 0.17f, METAL); // pole
+    addRect(vertices, lampX - 0.022f, GROUND_Y + 0.16f, lampX + 0.022f, GROUND_Y + 0.21f, METAL); // lamp box
+    addCircle(vertices, lampX, GROUND_Y + 0.185f, 0.017f, LAMP_GLOW); // light
+
+    // 5. flowers: stem + 4 petals + yellow center
+    // first collect where the flowers go, then draw them all in one loop
+    std::vector<float> flowerX;
+    std::vector<float> flowerY;
+
+    // some along each soil path between two lanes
+    for (int p = 0; p < GameConfig::LANE_COUNT - 1; p++)
+    {
+        float pathTop = GameConfig::LANE_CENTER_Y[p] - GameConfig::LANE_HALF_HEIGHT;
+        float pathBottom = GameConfig::LANE_CENTER_Y[p + 1] + GameConfig::LANE_HALF_HEIGHT;
+        float pathMiddle = (pathTop + pathBottom) / 2;
+        for (int i = 0; i < 3; i++)
+        {
+            flowerX.push_back(-0.25f + i * 0.5f);
+            flowerY.push_back(pathMiddle + 0.025f);
+        }
+    }
+
+    for (int i = 0; i < (int)flowerX.size(); i++)
+    {
+        float x = flowerX[i];
+        float y = flowerY[i];
+        float petal = 0.013f; // how far each petal is from the center
+
+        addRect(vertices, x - 0.003f, y - 0.05f, x + 0.003f, y, STEM);
+
+        addCircle(vertices, x - petal, y, 0.012f, PETAL_RED);
+        addCircle(vertices, x + petal, y, 0.012f, PETAL_RED);
+        addCircle(vertices, x, y - petal, 0.012f, PETAL_RED);
+        addCircle(vertices, x, y + petal, 0.012f, PETAL_RED);
+        addCircle(vertices, x, y, 0.009f, FLOWER_CENTER);
+    }
+
+    decoVertexCount = vertices.size() / 6;
+
+    glGenVertexArrays(1, &decoVAO);
+    glGenBuffers(1, &decoVBO);
+    glBindVertexArray(decoVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, decoVBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+
+    // position (location 0)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    // color (location 1)
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+// draw after drawLanes() so the path flowers are on top of the soil
+void drawDecorations()
+{
+    glUseProgram(laneShader);
+    glBindVertexArray(decoVAO);
+    GLint highlightLoc = glGetUniformLocation(laneShader, "u_Highlight");
+    glUniform1f(highlightLoc, 0.0f);
+    glDrawArrays(GL_TRIANGLES, 0, decoVertexCount);
+}
+
+void deleteDecorations()
+{
+    glDeleteVertexArrays(1, &decoVAO);
+    glDeleteBuffers(1, &decoVBO);
 }
