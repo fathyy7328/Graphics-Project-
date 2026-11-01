@@ -2,6 +2,19 @@
 #include <GLFW/glfw3.h>
 #include "../Common.h"
 #include <iostream>
+#include "../world/World.h"
+#include "Menus.h"
+#include <glad/gl.h>
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include <iostream>
+#include <map>
+#include <string>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <learnopengl/shader.h>
+#include "../enemies/Enemies.h"
 
 GAME_STATE G_STATE = GAME_STATE::Main_Menu;
 bool escapeWasPressed = false;
@@ -11,9 +24,6 @@ void Open_Cutscene(GLFWwindow* window);
 void Open_Playing(GLFWwindow* window);
 void Open_Pause(GLFWwindow* window);
 void Resume_Game(GLFWwindow* window);
-
-
-
 
 const char *vertexShaderSource = "#version 330 core\n"
     "layout (location = 0) in vec3 aPos;\n"
@@ -43,7 +53,7 @@ int main()
 
     // glfw window creation
     // --------------------
-    GLFWwindow* window = glfwCreateWindow(GameConfig::WINDOW_WIDTH, GameConfig::WINDOW_HEIGHT, "LearnOpenGL", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(GameConfig::WINDOW_WIDTH, GameConfig::WINDOW_HEIGHT, "REAL MADRID VS BARCELONA", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -61,6 +71,35 @@ int main()
         return -1;
     }
 
+    if (!initializeFont())
+    {
+        glfwDestroyWindow(window);
+        glfwTerminate();
+        return -1;
+    }
+        glEnable(GL_CULL_FACE);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        Shader textShader(
+            "assets/shaders/text.vs",
+            "assets/shaders/text.fs"
+        );
+
+        glm::mat4 textProjection = glm::ortho(
+            0.0f, static_cast<float>(GameConfig::WINDOW_WIDTH),
+            0.0f, static_cast<float>(GameConfig::WINDOW_HEIGHT)
+        );
+
+        textShader.use();
+        glUniformMatrix4fv(
+            glGetUniformLocation(textShader.ID, "projection"),
+            1, GL_FALSE, glm::value_ptr(textProjection)
+        );
+
+    createLanes();
+    createBackground();
+    movingTriangle();
 
     // build and compile our shader program
     // ------------------------------------
@@ -146,13 +185,21 @@ int main()
 
     // render loop
     // -----------
+    double previousTime = glfwGetTime();
     while (!glfwWindowShouldClose(window))
     {
         // input
         // -----
         // processInput(window);
+        const double currentTime = glfwGetTime();
+        const float deltaTime =
+        static_cast<float>(currentTime - previousTime);
+        previousTime = currentTime;
+
+
         Open_Cutscene(window);
         Open_Playing(window);
+        updateLanes(window);
         if (G_STATE == GAME_STATE::Playing)
         {
             Open_Pause(window);
@@ -176,7 +223,7 @@ int main()
         }
         else if (G_STATE == GAME_STATE::Playing)
         {
-            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+           glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
         }
         else if (G_STATE == GAME_STATE::Paused)
         {
@@ -191,14 +238,31 @@ int main()
             glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
         }
         glClear(GL_COLOR_BUFFER_BIT);
+        if (G_STATE == GAME_STATE::Main_Menu)
+        {
+            RenderText(
+                textShader,
+                "REAL MADRID VS BARCELONA",
+                150.0f, 400.0f,
+                0.85f,
+                glm::vec3(1.0f, 1.0f, 1.0f)
+            );
+            RenderText(
+                textShader,
+                "Press Enter to Start The Game",
+                150.0f, 100.0f,
+                0.85f,
+                glm::vec3(1.0f, 1.0f, 1.0f)
+            );
+        }
+        if (G_STATE == GAME_STATE::Playing)
 
-        // draw our first triangle
-        glUseProgram(shaderProgram);
-        glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
-        //glDrawArrays(GL_TRIANGLES, 0, 6);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        // glBindVertexArray(0); // no need to unbind it every time 
- 
+          { updateEnemyPosition(deltaTime);
+            drawBackground();
+            drawLanes();
+            drawTriangle();
+
+        }
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
@@ -211,6 +275,8 @@ int main()
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
     glDeleteProgram(shaderProgram);
+    deleteBackground();
+    deleteLanes();
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
@@ -254,6 +320,7 @@ void Resume_Game(GLFWwindow* window)
         G_STATE = GAME_STATE::Playing;
     }
 }
+
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
