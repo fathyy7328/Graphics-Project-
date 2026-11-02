@@ -3,3 +3,4 @@
 void movingTriangle();
 void drawTriangle();
 void updateEnemyPosition(float deltaTime);
+void resetEnemies();

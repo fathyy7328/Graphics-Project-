@@ -7,11 +7,20 @@
 #include <cstdlib>
 #include <ctime>
 
+enum class enemyType {
+    Easy,
+    Medium,
+    Hard
+};
+
 struct enemy {
     float x;
     int lane;
     float speed;
     bool alive;
+    enemyType type;
+    int health;
+    int maxHealth;
 };
 
 static GLuint enemyVAO = 0, enemyVBO = 0;
@@ -24,6 +33,7 @@ static const float ENEMY_SPEED = 0.2f;
 static int currentWave = 0;
 static int spawnedEnemies = 0;
 static const int waves[] = { 3, 5, 10 };
+static bool gameLost = false;
 
 static const char* enemyVertexShaderSource = R"(
 #version 330 core
@@ -102,11 +112,43 @@ void spawnEnemy() {
     newEnemy.lane = rand() % GameConfig::LANE_COUNT;
     newEnemy.speed = ENEMY_SPEED;
     newEnemy.alive = true;
+    if (currentWave == 0){
+        newEnemy.type = enemyType::Easy;
+        newEnemy.health = 5;
+        newEnemy.maxHealth = 5;
+    }      
+    else if (currentWave == 1){
+        int pick = rand() % 2;
+            if (pick == 0) 
+                newEnemy.type = enemyType::Easy;
+            else
+                newEnemy.type = enemyType::Medium;
+        newEnemy.health = 5;
+        newEnemy.maxHealth = newEnemy.health;
+        
+    }      
+    else {
+        int pick = rand() % 3;
+            if (pick == 0) 
+                newEnemy.type = enemyType::Easy;
+            else
+                if (pick == 1)
+                    newEnemy.type = enemyType::Medium;
+                else{
+                    newEnemy.type = enemyType::Hard;
+                    newEnemy.speed = ENEMY_SPEED * 2.0f;
+                }       
+        newEnemy.health = (newEnemy.type == enemyType::Easy || newEnemy.type == enemyType::Medium) ? 5 : 7;
+        newEnemy.maxHealth = newEnemy.health;   
+    }
+
     enemies.push_back(newEnemy);
 }
 
 void updateEnemyPosition(float deltaTime) {
     
+    if (gameLost) return;
+
     spawnTimer += deltaTime;
     if (spawnTimer >= spawnInterval && currentWave < sizeof(waves) / sizeof(waves[0]) && spawnedEnemies < waves[currentWave]) {
         spawnEnemy();
@@ -118,8 +160,9 @@ void updateEnemyPosition(float deltaTime) {
     for (auto& enemy : enemies) {
         if (!enemy.alive) continue;
         enemy.x -= enemy.speed * deltaTime;
-        if (enemy.x < -1.0f) {
-            enemy.alive = false;
+        if (enemy.x <= GameConfig::HOME_BASE_LEFT) {
+            gameLost = true;
+            std::cout << "Game Over!" << std::endl;
         }
     }
     bool anyAlive = false;
@@ -140,4 +183,10 @@ void updateEnemyPosition(float deltaTime) {
     }
 }
 
-
+void resetEnemies() {
+    enemies.clear();
+    currentWave = 0;
+    spawnedEnemies = 0;
+    spawnTimer = 0.0f;
+    gameLost = false;
+}
