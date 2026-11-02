@@ -147,7 +147,7 @@ void spawnEnemy() {
 
 void updateEnemyPosition(float deltaTime) {
     
-    //if (gameLost) return;
+    if (gameLost) return;
 
     spawnTimer += deltaTime;
     if (spawnTimer >= spawnInterval && currentWave < sizeof(waves) / sizeof(waves[0]) && spawnedEnemies < waves[currentWave]) {
