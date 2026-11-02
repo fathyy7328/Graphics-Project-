@@ -147,7 +147,7 @@ void spawnEnemy() {
 
 void updateEnemyPosition(float deltaTime) {
     
-    if (gameLost) return;
+    //if (gameLost) return;
 
     spawnTimer += deltaTime;
     if (spawnTimer >= spawnInterval && currentWave < sizeof(waves) / sizeof(waves[0]) && spawnedEnemies < waves[currentWave]) {
@@ -158,7 +158,9 @@ void updateEnemyPosition(float deltaTime) {
     }
     
     for (auto& enemy : enemies) {
+        
         if (!enemy.alive) continue;
+
         enemy.x -= enemy.speed * deltaTime;
         if (enemy.x <= GameConfig::HOME_BASE_RIGHT) {
             gameLost = true;
