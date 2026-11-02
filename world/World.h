@@ -25,3 +25,6 @@ void createHomeBase();
 void drawHomeBase();
 void deleteHomeBase();
 void worldReset();
+void createCards();
+void drawCards();
+void deleteCards();

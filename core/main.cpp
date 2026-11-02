@@ -102,6 +102,7 @@ int main()
     createDecorations();
     createHomeBase();
     createHealthBar();
+    createCards();
     movingTriangle();
 
     // build and compile our shader program
@@ -270,6 +271,7 @@ int main()
             drawLanes();
             drawDecorations();
             drawHomeBase();
+            drawCards();
             drawTriangle();
 
         }
@@ -324,10 +326,12 @@ int main()
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
     glDeleteProgram(shaderProgram);
-    deleteBackground();
-    deleteLanes();
-    deleteDecorations();
+    deleteCards();
+    deleteHealthBar();
     deleteHomeBase();
+    deleteDecorations();
+    deleteBackground();
+    deleteLanes(); // last, it deletes the shader the others use
     
 
     // glfw: terminate, clearing all previously allocated GLFW resources.

@@ -2,8 +2,13 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <learnopengl/shader.h>
 #include "World.h"
 #include "../Common.h"
+#include "../core/Menus.h"
 
 GLuint laneVAO, laneVBO, laneShader;
 
@@ -648,4 +653,91 @@ void deleteHomeBase()
 {
     glDeleteVertexArrays(1, &homeVAO);
     glDeleteBuffers(1, &homeVBO);
+}
+
+// ---------------- Player cards ----------------
+
+GLuint cardVAO, cardVBO;
+Shader* cardTextShader = nullptr; // made in createCards(), after OpenGL has started
+
+const int CARD_COUNT = 3;
+const int RECTS_PER_CARD = 3; 
+const float CARD_WIDTH = 0.14f;
+const float CARD_GAP = 0.02f;
+const float CARD_LEFT = -0.97f;   
+const float CARD_BOTTOM = 0.77f;
+const float CARD_TOP = 0.98f;
+const float CARD_BORDER[3] = {0.25f, 0.15f, 0.08f};
+const float CARD_BG[3]     = {0.95f, 0.90f, 0.78f};
+const float CARD_INNER[3]  = {0.86f, 0.80f, 0.66f};
+const char* CARD_LETTERS[CARD_COUNT] = {"M", "R", "D"};
+const char* CARD_PRICES[CARD_COUNT] = {"10", "20", "30"};
+
+float cardLeft(int i)
+{
+    return CARD_LEFT + i * (CARD_WIDTH + CARD_GAP);
+}
+
+// call after createLanes() because it uses the lane shader
+void createCards()
+{
+    std::vector<float> vertices;
+    for (int i = 0; i < CARD_COUNT; i++)
+    {
+        float left = cardLeft(i);
+        float right = left + CARD_WIDTH;
+
+        addRect(vertices, left, CARD_BOTTOM, right, CARD_TOP, CARD_BORDER);                            
+        addRect(vertices, left + 0.008f, CARD_BOTTOM + 0.01f, right - 0.008f, CARD_TOP - 0.01f, CARD_BG); 
+        addRect(vertices, left + 0.02f, CARD_BOTTOM + 0.08f, right - 0.02f, CARD_TOP - 0.025f, CARD_INNER); 
+    }
+
+    glGenVertexArrays(1, &cardVAO);
+    glGenBuffers(1, &cardVBO);
+    glBindVertexArray(cardVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, cardVBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+   
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
+    cardTextShader = new Shader("assets/shaders/text.vs", "assets/shaders/text.fs");
+    glm::mat4 projection = glm::ortho(0.0f, (float)GameConfig::WINDOW_WIDTH, 0.0f, (float)GameConfig::WINDOW_HEIGHT);
+    cardTextShader->use();
+    glUniformMatrix4fv(glGetUniformLocation(cardTextShader->ID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+}
+
+// draw after drawBackground() so the cards are on top of the wooden bar
+void drawCards()
+{
+    glUseProgram(laneShader);
+    glBindVertexArray(cardVAO);
+    GLint highlightLoc = glGetUniformLocation(laneShader, "u_Highlight");
+    glUniform1f(highlightLoc, 0.0f);
+    glDrawArrays(GL_TRIANGLES, 0, CARD_COUNT * RECTS_PER_CARD * 6);
+
+    for (int i = 0; i < CARD_COUNT; i++)
+    {
+        // change from -1..1 to pixels for the text
+        float centerX = (cardLeft(i) + CARD_WIDTH / 2 + 1.0f) * GameConfig::WINDOW_WIDTH / 2.0f;
+        float letterY = (CARD_BOTTOM + 0.10f + 1.0f) * GameConfig::WINDOW_HEIGHT / 2.0f;
+        float priceY = (CARD_BOTTOM + 0.025f + 1.0f) * GameConfig::WINDOW_HEIGHT / 2.0f;
+
+        RenderText(*cardTextShader, CARD_LETTERS[i], centerX - 13.0f, letterY, 0.95f, glm::vec3(0.25f, 0.15f, 0.08f));
+        RenderText(*cardTextShader, CARD_PRICES[i], centerX - 12.0f, priceY, 0.55f, glm::vec3(0.25f, 0.15f, 0.08f));
+    }
+}
+
+void deleteCards()
+{
+    glDeleteVertexArrays(1, &cardVAO);
+    glDeleteBuffers(1, &cardVBO);
+    glDeleteProgram(cardTextShader->ID);
+    delete cardTextShader;
 }
