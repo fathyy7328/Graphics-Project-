@@ -160,7 +160,7 @@ void updateEnemyPosition(float deltaTime) {
     for (auto& enemy : enemies) {
         if (!enemy.alive) continue;
         enemy.x -= enemy.speed * deltaTime;
-        if (enemy.x <= GameConfig::HOME_BASE_LEFT) {
+        if (enemy.x <= GameConfig::HOME_BASE_RIGHT) {
             gameLost = true;
             std::cout << "Game Over!" << std::endl;
         }
