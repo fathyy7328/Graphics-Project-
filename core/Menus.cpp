@@ -31,7 +31,7 @@ bool initializeFont()
         return false;
     }
 
-    const std::string fontPath = "assets/fonts/Antonio-Bold.ttf";
+    const std::string fontPath = "assets/fonts/Orbitron-ExtraBold.ttf";
     if (FT_New_Face(ft, fontPath.c_str(), 0, &face))
     {
         std::cout << "Could not load font: " << fontPath << std::endl;
@@ -39,7 +39,7 @@ bool initializeFont()
         return false;
     }
 
-    if (FT_Set_Pixel_Sizes(face, 0, 48))
+    if (FT_Set_Pixel_Sizes(face, 0, 30))
     {
         std::cout << "Could not set font size" << std::endl;
         FT_Done_Face(face);

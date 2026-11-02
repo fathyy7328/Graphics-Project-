@@ -99,6 +99,9 @@ int main()
 
     createLanes();
     createBackground();
+    createDecorations();
+    createHomeBase();
+    createHealthBar();
     movingTriangle();
 
     // build and compile our shader program
@@ -215,23 +218,23 @@ int main()
         // ------
         if (G_STATE == GAME_STATE::Main_Menu)
         {
-            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+            glClearColor(0.0f, 0.3f, 0.0f, 1.0f);
         }
         else if (G_STATE == GAME_STATE::Cutscene)
         {
-            glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+            glClearColor(0.0f, 0.5f, 0.0f, 1.0f);
         }
         else if (G_STATE == GAME_STATE::Playing)
         {
-           glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
+           glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         }
         else if (G_STATE == GAME_STATE::Paused)
         {
-            glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
+            glClearColor(0.0f, 0.5f, 0.0f, 1.0f);
         }
         else if (G_STATE == GAME_STATE::Win)
         {
-            glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
+            glClearColor(0.0f, 0.5f, 0.0f, 1.0f);
         }
         else if (G_STATE == GAME_STATE::Lose)
         {
@@ -240,10 +243,11 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
         if (G_STATE == GAME_STATE::Main_Menu)
         {
+            drawDecorations();
             RenderText(
                 textShader,
                 "REAL MADRID VS BARCELONA",
-                150.0f, 400.0f,
+                150.0f, 450.0f,
                 0.85f,
                 glm::vec3(1.0f, 1.0f, 1.0f)
             );
@@ -253,15 +257,60 @@ int main()
                 150.0f, 100.0f,
                 0.85f,
                 glm::vec3(1.0f, 1.0f, 1.0f)
-            );
+
+               
+            )
+            ;
+          
         }
         if (G_STATE == GAME_STATE::Playing)
 
           { updateEnemyPosition(deltaTime);
             drawBackground();
             drawLanes();
+            drawDecorations();
+            drawHomeBase();
             drawTriangle();
 
+        }
+        if (G_STATE == GAME_STATE::Cutscene)
+        {
+            drawBackground();
+            drawDecorations();
+            drawHomeBase();
+
+            
+            RenderText(
+                textShader,
+                "The Trophy Garden is under attack!",
+                150.0f, 180.0f,
+                0.85f,
+                glm::vec3(1.0f, 1.0f, 1.0f)
+            );
+
+            RenderText(
+                textShader,
+                "Barcelona is coming for the trophies.",
+                150.0f, 130.0f,
+                0.85f,
+                glm::vec3(1.0f, 1.0f, 1.0f)
+            );
+
+            RenderText(
+                textShader,
+                "Real Madrid, defend them!",
+                150.0f, 80.0f,
+                0.85f,
+                glm::vec3(1.0f, 1.0f, 1.0f)
+            );
+
+            RenderText(
+                textShader,
+                "Press SPACE to begin.",
+                150.0f, 30.0f,
+                0.7f,
+                glm::vec3(1.0f, 1.0f, 1.0f)
+            );
         }
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
@@ -277,6 +326,9 @@ int main()
     glDeleteProgram(shaderProgram);
     deleteBackground();
     deleteLanes();
+    deleteDecorations();
+    deleteHomeBase();
+    
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
