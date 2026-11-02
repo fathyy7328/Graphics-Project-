@@ -204,6 +204,7 @@ int main()
         Open_Cutscene(window);
         Open_Playing(window);
         updateLanes(window);
+        updateCards(window);
         if (G_STATE == GAME_STATE::Playing)
         {
             Open_Pause(window);

@@ -28,3 +28,7 @@ void worldReset();
 void createCards();
 void drawCards();
 void deleteCards();
+bool isCardUnlocked(int i);
+void updateCards(GLFWwindow* window);
+int getSelectedCard();
+void resetCards();

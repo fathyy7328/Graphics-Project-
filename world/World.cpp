@@ -41,10 +41,13 @@ const char* laneFragmentShaderSource = R"(
 #version 330 core
 in vec3 vColor;
 out vec4 FragColor;
-uniform float u_Highlight; 
+uniform float u_Highlight;
+uniform float u_Gray; // 0 = normal colors, 1 = fully gray (for locked cards)
 void main()
 {
-    FragColor = vec4(mix(vColor, vec3(1.0), u_Highlight), 1.0);
+    vec3 color = mix(vColor, vec3(1.0), u_Highlight);
+    float gray = color.r * 0.3 + color.g * 0.59 + color.b * 0.11; // how bright the color is
+    FragColor = vec4(mix(color, vec3(gray), u_Gray), 1.0);
 }
 )";
 
@@ -309,6 +312,7 @@ void deleteHealthBar()
 // ---------------- Coins ----------------
 
 int coins = GameConfig::STARTING_COINS;
+int meleePlaced = 0; 
 void addCoins(int n)
 {
     if (n <= 0)
@@ -340,11 +344,13 @@ void resetCoins()
 void worldReset()
 {
     resetCoins();
+    meleePlaced = 0;
     for (int i = 0; i < GameConfig::LANE_COUNT; i++)
     {
         laneSelected[i] = false;
     }
     hoveredLane = -1;
+    resetCards(); // no card hovered or selected
 }
 
 // ---------------- Background ----------------
@@ -673,6 +679,11 @@ const float CARD_INNER[3]  = {0.86f, 0.80f, 0.66f};
 const char* CARD_LETTERS[CARD_COUNT] = {"M", "R", "D"};
 const char* CARD_PRICES[CARD_COUNT] = {"10", "20", "30"};
 
+// hover and selection (same idea as the lanes)
+int hoveredCard = -1;  // card under the mouse, -1 means none
+int selectedCard = -1; // card chosen for placing a player, -1 means none
+bool cardMouseWasPressed = false;
+
 float cardLeft(int i)
 {
     return CARD_LEFT + i * (CARD_WIDTH + CARD_GAP);
@@ -714,14 +725,50 @@ void createCards()
 }
 
 // draw after drawBackground() so the cards are on top of the wooden bar
+bool isCardUnlocked(int i)
+{
+    if (i == 0)
+        return getCoins() >= GameConfig::MELEE_COST;
+    if (meleePlaced < 3)
+        return false;
+    if (i == 1)
+        return getCoins() >= GameConfig::RANGED_COST;
+    return getCoins() >= GameConfig::DEFENSE_COST;
+}
+
 void drawCards()
 {
     glUseProgram(laneShader);
     glBindVertexArray(cardVAO);
     GLint highlightLoc = glGetUniformLocation(laneShader, "u_Highlight");
+    GLint grayLoc = glGetUniformLocation(laneShader, "u_Gray");
     glUniform1f(highlightLoc, 0.0f);
-    glDrawArrays(GL_TRIANGLES, 0, CARD_COUNT * RECTS_PER_CARD * 6);
 
+    // 1. the card boxes, one card at a time so each one can be gray or highlighted
+    for (int i = 0; i < CARD_COUNT; i++)
+    {
+        if (isCardUnlocked(i))
+            glUniform1f(grayLoc, 0.0f);
+        else
+            glUniform1f(grayLoc, 1.0f);
+
+        // only unlocked cards can be hovered or selected (updateCards makes sure of that)
+        if (selectedCard == i)
+            glUniform1f(highlightLoc, SELECTED_HIGHLIGHT);
+        else if (hoveredCard == i)
+            glUniform1f(highlightLoc, HOVER_HIGHLIGHT);
+        else
+            glUniform1f(highlightLoc, 0.0f);
+
+        int firstVertex = i * RECTS_PER_CARD * 6;
+        glDrawArrays(GL_TRIANGLES, firstVertex, RECTS_PER_CARD * 6);
+    }
+
+    // put gray and highlight back to 0, or other things would be gray or white on the next frame
+    glUniform1f(grayLoc, 0.0f);
+    glUniform1f(highlightLoc, 0.0f);
+
+    // 2. the letter and the price on each card
     for (int i = 0; i < CARD_COUNT; i++)
     {
         // change from -1..1 to pixels for the text
@@ -729,9 +776,73 @@ void drawCards()
         float letterY = (CARD_BOTTOM + 0.10f + 1.0f) * GameConfig::WINDOW_HEIGHT / 2.0f;
         float priceY = (CARD_BOTTOM + 0.025f + 1.0f) * GameConfig::WINDOW_HEIGHT / 2.0f;
 
-        RenderText(*cardTextShader, CARD_LETTERS[i], centerX - 13.0f, letterY, 0.95f, glm::vec3(0.25f, 0.15f, 0.08f));
-        RenderText(*cardTextShader, CARD_PRICES[i], centerX - 12.0f, priceY, 0.55f, glm::vec3(0.25f, 0.15f, 0.08f));
+        // dark brown text, or dark gray text if the card is locked
+        glm::vec3 textColor = glm::vec3(0.25f, 0.15f, 0.08f);
+        if (!isCardUnlocked(i))
+            textColor = glm::vec3(0.17f, 0.17f, 0.17f);
+
+        RenderText(*cardTextShader, CARD_LETTERS[i], centerX - 13.0f, letterY, 0.95f, textColor);
+        RenderText(*cardTextShader, CARD_PRICES[i], centerX - 12.0f, priceY, 0.55f, textColor);
     }
+}
+
+// call every frame: hover and click on the cards. Locked cards ignore the mouse.
+void updateCards(GLFWwindow* window)
+{
+    bool pressed = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+
+    // a card that becomes locked (not enough coins) cannot stay selected
+    if (selectedCard != -1 && !isCardUnlocked(selectedCard))
+        selectedCard = -1;
+
+    // only the Playing screen reacts to the mouse
+    if (G_STATE != GAME_STATE::Playing)
+    {
+        hoveredCard = -1;
+        cardMouseWasPressed = pressed;
+        return;
+    }
+
+    // mouse position changed to -1..1 (same as updateLanes)
+    double mouseX, mouseY;
+    glfwGetCursorPos(window, &mouseX, &mouseY);
+    int width, height;
+    glfwGetWindowSize(window, &width, &height);
+    float x = (float)mouseX / (width / 2.0f) - 1.0f;
+    float y = 1.0f - (float)mouseY / (height / 2.0f);
+
+    hoveredCard = -1;
+    for (int i = 0; i < CARD_COUNT; i++)
+    {
+        bool insideX = x >= cardLeft(i) && x <= cardLeft(i) + CARD_WIDTH;
+        bool insideY = y >= CARD_BOTTOM && y <= CARD_TOP;
+
+        // locked cards are skipped, so they never get hovered or clicked
+        if (insideX && insideY && isCardUnlocked(i))
+            hoveredCard = i;
+    }
+
+    // click on a card selects it, click on the same card again deselects it
+    if (pressed && !cardMouseWasPressed && hoveredCard != -1)
+    {
+        if (selectedCard == hoveredCard)
+            selectedCard = -1;
+        else
+            selectedCard = hoveredCard;
+    }
+    cardMouseWasPressed = pressed;
+}
+
+// which card is selected (-1 = none), used later for placing a player
+int getSelectedCard()
+{
+    return selectedCard;
+}
+
+void resetCards()
+{
+    hoveredCard = -1;
+    selectedCard = -1;
 }
 
 void deleteCards()
