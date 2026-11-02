@@ -744,15 +744,12 @@ void drawCards()
     GLint grayLoc = glGetUniformLocation(laneShader, "u_Gray");
     glUniform1f(highlightLoc, 0.0f);
 
-    // 1. the card boxes, one card at a time so each one can be gray or highlighted
     for (int i = 0; i < CARD_COUNT; i++)
     {
         if (isCardUnlocked(i))
             glUniform1f(grayLoc, 0.0f);
         else
             glUniform1f(grayLoc, 1.0f);
-
-        // only unlocked cards can be hovered or selected (updateCards makes sure of that)
         if (selectedCard == i)
             glUniform1f(highlightLoc, SELECTED_HIGHLIGHT);
         else if (hoveredCard == i)
@@ -764,7 +761,6 @@ void drawCards()
         glDrawArrays(GL_TRIANGLES, firstVertex, RECTS_PER_CARD * 6);
     }
 
-    // put gray and highlight back to 0, or other things would be gray or white on the next frame
     glUniform1f(grayLoc, 0.0f);
     glUniform1f(highlightLoc, 0.0f);
 
@@ -786,7 +782,6 @@ void drawCards()
     }
 }
 
-// call every frame: hover and click on the cards. Locked cards ignore the mouse.
 void updateCards(GLFWwindow* window)
 {
     bool pressed = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
@@ -795,7 +790,6 @@ void updateCards(GLFWwindow* window)
     if (selectedCard != -1 && !isCardUnlocked(selectedCard))
         selectedCard = -1;
 
-    // only the Playing screen reacts to the mouse
     if (G_STATE != GAME_STATE::Playing)
     {
         hoveredCard = -1;
@@ -833,7 +827,6 @@ void updateCards(GLFWwindow* window)
     cardMouseWasPressed = pressed;
 }
 
-// which card is selected (-1 = none), used later for placing a player
 int getSelectedCard()
 {
     return selectedCard;
