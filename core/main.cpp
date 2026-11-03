@@ -24,6 +24,7 @@ void Open_Cutscene(GLFWwindow* window);
 void Open_Playing(GLFWwindow* window);
 void Open_Pause(GLFWwindow* window);
 void Resume_Game(GLFWwindow* window);
+void Return_to_Main_Menu(GLFWwindow* window);
 
 const char *vertexShaderSource = "#version 330 core\n"
     "layout (location = 0) in vec3 aPos;\n"
@@ -212,6 +213,7 @@ int main()
         else if (G_STATE == GAME_STATE::Paused)
         {
             Resume_Game(window);
+            drawDecorations();
         }
 
         escapeWasPressed = glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS;
@@ -315,6 +317,31 @@ int main()
                 glm::vec3(1.0f, 1.0f, 1.0f)
             );
         }
+            if (G_STATE == GAME_STATE::Paused)
+        {
+            Resume_Game(window);
+            
+            drawDecorations();
+            RenderText(
+                textShader,
+                "Press the ESC key to resume the game.",
+                150.0f, 450.0f,
+                0.85f,
+                glm::vec3(1.0f, 1.0f, 1.0f)
+            );
+            RenderText(
+                textShader,
+                "Press X to return to the main menu.",
+                150.0f, 100.0f,
+                0.85f,
+                glm::vec3(1.0f, 1.0f, 1.0f)
+
+               
+            );
+            Return_to_Main_Menu(window);
+            
+
+        }
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
@@ -375,6 +402,13 @@ void Resume_Game(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && !escapeWasPressed && G_STATE == GAME_STATE::Paused)
     {
         G_STATE = GAME_STATE::Playing;
+    }
+}
+void Return_to_Main_Menu(GLFWwindow* window)
+{
+    if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS && G_STATE == GAME_STATE::Paused)
+    {
+        G_STATE = GAME_STATE::Main_Menu;
     }
 }
 
