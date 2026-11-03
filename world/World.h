@@ -32,3 +32,6 @@ bool isCardUnlocked(int i);
 void updateCards(GLFWwindow* window);
 int getSelectedCard();
 void resetCards();
+void createCoinCounter(); // called by createCards()
+void drawCoinCounter();   // called by drawCards()
+void deleteCoinCounter(); // called by deleteCards()

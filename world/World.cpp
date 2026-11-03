@@ -664,7 +664,7 @@ void deleteHomeBase()
 // ---------------- Player cards ----------------
 
 GLuint cardVAO, cardVBO;
-Shader* cardTextShader = nullptr; // made in createCards(), after OpenGL has started
+Shader* cardTextShader = nullptr; 
 
 const int CARD_COUNT = 3;
 const int RECTS_PER_CARD = 3; 
@@ -680,8 +680,8 @@ const char* CARD_LETTERS[CARD_COUNT] = {"M", "R", "D"};
 const char* CARD_PRICES[CARD_COUNT] = {"10", "20", "30"};
 
 // hover and selection (same idea as the lanes)
-int hoveredCard = -1;  // card under the mouse, -1 means none
-int selectedCard = -1; // card chosen for placing a player, -1 means none
+int hoveredCard = -1;  
+int selectedCard = -1; 
 bool cardMouseWasPressed = false;
 
 float cardLeft(int i)
@@ -722,6 +722,8 @@ void createCards()
     glm::mat4 projection = glm::ortho(0.0f, (float)GameConfig::WINDOW_WIDTH, 0.0f, (float)GameConfig::WINDOW_HEIGHT);
     cardTextShader->use();
     glUniformMatrix4fv(glGetUniformLocation(cardTextShader->ID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+    createCoinCounter(); 
 }
 
 // draw after drawBackground() so the cards are on top of the wooden bar
@@ -780,6 +782,8 @@ void drawCards()
         RenderText(*cardTextShader, CARD_LETTERS[i], centerX - 13.0f, letterY, 0.95f, textColor);
         RenderText(*cardTextShader, CARD_PRICES[i], centerX - 12.0f, priceY, 0.55f, textColor);
     }
+
+    drawCoinCounter(); 
 }
 
 void updateCards(GLFWwindow* window)
@@ -840,8 +844,58 @@ void resetCards()
 
 void deleteCards()
 {
+    deleteCoinCounter();
     glDeleteVertexArrays(1, &cardVAO);
     glDeleteBuffers(1, &cardVBO);
     glDeleteProgram(cardTextShader->ID);
     delete cardTextShader;
+}
+
+// ---------------- Coin counter ----------------
+
+GLuint coinVAO, coinVBO;
+int coinVertexCount = 0;
+const float COIN_X = 0.72f; 
+const float COIN_Y = 0.875f;
+
+void createCoinCounter()
+{
+    std::vector<float> vertices;
+    addCircle(vertices, COIN_X, COIN_Y, 0.05f, GOLD_DARK);
+    addCircle(vertices, COIN_X, COIN_Y, 0.036f, GOLD);
+
+    coinVertexCount = vertices.size() / 6;
+
+    glGenVertexArrays(1, &coinVAO);
+    glGenBuffers(1, &coinVBO);
+    glBindVertexArray(coinVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, coinVBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+void drawCoinCounter()
+{
+    glUseProgram(laneShader);
+    glBindVertexArray(coinVAO);
+    glUniform1f(glGetUniformLocation(laneShader, "u_Highlight"), 0.0f);
+    glUniform1f(glGetUniformLocation(laneShader, "u_Gray"), 0.0f);
+    glDrawArrays(GL_TRIANGLES, 0, coinVertexCount);
+
+    float textX = (COIN_X + 0.07f + 1.0f) * GameConfig::WINDOW_WIDTH / 2.0f;
+    float textY = (COIN_Y - 0.035f + 1.0f) * GameConfig::WINDOW_HEIGHT / 2.0f;
+    RenderText(*cardTextShader, std::to_string(getCoins()), textX, textY, 1.0f, glm::vec3(1.0f, 0.95f, 0.80f));
+}
+
+void deleteCoinCounter()
+{
+    glDeleteVertexArrays(1, &coinVAO);
+    glDeleteBuffers(1, &coinVBO);
 }
