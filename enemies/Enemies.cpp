@@ -33,7 +33,6 @@ struct enemy {
     int maxHealth;
 };
 
-static GLuint enemyVAO = 0, enemyVBO = 0;
 static GLuint squareVAO = 0, squareVBO = 0;
 static GLuint circleVAO = 0, circleVBO = 0;
 static int circleVertexCount = 0;
@@ -41,6 +40,7 @@ static GLuint triangleVAO = 0, triangleVBO = 0;
 static GLuint enemyShaderProgram = 0;
 static GLint enemyTransformLocation = -1;
 static GLint enemyColorLocation = -1;
+static GLint enemyDamageLocation = -1;
 static std::vector<enemy> enemies;
 static float spawnTimer = 0.0f;
 static const float spawnInterval = 2.0f;
@@ -49,6 +49,7 @@ static int currentWave = 0;
 static int spawnedEnemies = 0;
 static const int waves[] = { 3, 5, 10 };
 static bool gameLost = false;
+
 
 static const char* enemyVertexShaderSource = R"(
 #version 330 core
@@ -64,9 +65,10 @@ static const char* enemyFragmentShaderSource = R"(
 #version 330 core
 out vec4 FragColor;
 uniform vec3 color;
+uniform float damage;
 void main()
 {
-FragColor = vec4(color, 1.0);
+FragColor = vec4(mix(color, vec3(1.0, 0.0, 0.0), damage), 1.0);
 }
 )";
 
@@ -166,7 +168,10 @@ void movingTriangle(){
 
     enemyTransformLocation = glGetUniformLocation(enemyShaderProgram, "transform");
     enemyColorLocation = glGetUniformLocation(enemyShaderProgram, "color");
+    enemyDamageLocation = glGetUniformLocation(enemyShaderProgram, "damage");
     srand(time(nullptr));
+
+
 
     createSquare();
     createCircle();
@@ -279,9 +284,12 @@ void drawTriangle(){
     
     for (auto& enemy : enemies) {
         if (!enemy.alive) continue;
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], 0.0f));
-        glUniformMatrix4fv(enemyTransformLocation, 1, GL_FALSE, &(model[0][0]));
+        
+        float damage = 1.0f - (float)enemy.health / enemy.maxHealth;
+        if (damage > 0.7f) 
+            damage = 0.7f;
+        glUseProgram(enemyShaderProgram);
+        glUniform1f(enemyDamageLocation, damage);
         if (enemy.type == enemyType::Easy)
             drawEasyEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], 0.0f, false);        
         else if (enemy.type == enemyType::Medium)
@@ -289,7 +297,6 @@ void drawTriangle(){
         else
             drawHardEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], 0.0f, false);    
         drawHealthBar(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane] + 0.13f, enemy.health, enemy.maxHealth);        
-        glDrawArrays(GL_TRIANGLES, 0, 3);
     }
 }
 
@@ -301,7 +308,7 @@ void spawnEnemy() {
     newEnemy.alive = true;
     if (currentWave == 0){
         newEnemy.type = enemyType::Easy;
-        newEnemy.health = 5;
+        newEnemy.health = 5; //test
         newEnemy.maxHealth = 5;
     }      
     else if (currentWave == 1){
