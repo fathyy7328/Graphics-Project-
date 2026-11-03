@@ -6,11 +6,21 @@
 #include <vector>
 #include <cstdlib>
 #include <ctime>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <cmath>
 
 enum class enemyType {
     Easy,
     Medium,
     Hard
+};
+
+enum class Shape {
+    Square,
+    Circle,
+    Triangle
 };
 
 struct enemy {
@@ -24,8 +34,13 @@ struct enemy {
 };
 
 static GLuint enemyVAO = 0, enemyVBO = 0;
+static GLuint squareVAO = 0, squareVBO = 0;
+static GLuint circleVAO = 0, circleVBO = 0;
+static int circleVertexCount = 0;
+static GLuint triangleVAO = 0, triangleVBO = 0;
 static GLuint enemyShaderProgram = 0;
-static GLint enemyOffsetLocation = -1;
+static GLint enemyTransformLocation = -1;
+static GLint enemyColorLocation = -1;
 static std::vector<enemy> enemies;
 static float spawnTimer = 0.0f;
 static const float spawnInterval = 2.0f;
@@ -38,42 +53,100 @@ static bool gameLost = false;
 static const char* enemyVertexShaderSource = R"(
 #version 330 core
 layout (location = 0) in vec3 aPos;
-uniform vec2 offset;
+uniform mat4 transform;
 void main()
 {
-gl_Position = vec4(aPos.x + offset.x, aPos.y + offset.y, aPos.z, 1.0);
+gl_Position = transform * vec4(aPos, 1.0);
 }
 )";
 
 static const char* enemyFragmentShaderSource = R"(
 #version 330 core
 out vec4 FragColor;
+uniform vec3 color;
 void main()
 {
-FragColor = vec4(1.0, 0.8, 0.2, 1.0);
+FragColor = vec4(color, 1.0);
 }
 )";
 
-void movingTriangle(){
+void createSquare() {
+    float squareVertices[] = {
+        -0.5f, -0.5f, 0.0f,   // bottom left
+         0.5f, -0.5f, 0.0f,   // bottom right
+         0.5f,  0.5f, 0.0f,   // top right
 
-    float vertices[] = {
-    0.1f, 0.1f, 0.0f, // top
-    -0.1f, 0.0f, 0.0f, // mid
-    0.1f, -0.1f, 0.0f // bottom
+        -0.5f, -0.5f, 0.0f,   // bottom left
+         0.5f,  0.5f, 0.0f,   // top right
+        -0.5f,  0.5f, 0.0f    // top left
     };
 
-    glGenVertexArrays(1, &enemyVAO);
-    glGenBuffers(1, &enemyVBO);
-    glBindVertexArray(enemyVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, enemyVBO);
+    glGenVertexArrays(1, &squareVAO); 
+    glGenBuffers(1, &squareVBO); 
+    glBindVertexArray(squareVAO); 
+    glBindBuffer(GL_ARRAY_BUFFER, squareVBO); 
+    glBufferData(GL_ARRAY_BUFFER, sizeof(squareVertices), squareVertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+void createCircle() {
+    std::vector<float> circleVertices;
+    circleVertices.push_back(0.0f); //x
+    circleVertices.push_back(0.0f); //y
+    circleVertices.push_back(0.0f); //z
+    
+    const int segments = 30;                          
+
+    for (int i = 0; i <= segments; i++) {
+        float angle = i * 2.0f * 3.14159f / segments; 
+
+        circleVertices.push_back(0.5f * cos(angle));  // x
+        circleVertices.push_back(0.5f * sin(angle));  // y
+        circleVertices.push_back(0.0f);               // z 
+
+    }
+
+    circleVertexCount = circleVertices.size() / 3; 
+
+    glGenVertexArrays(1, &circleVAO);
+    glGenBuffers(1, &circleVBO);
+    glBindVertexArray(circleVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, circleVBO);
+    glBufferData(GL_ARRAY_BUFFER, circleVertices.size() * sizeof(float), circleVertices.data(), GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
+}
+
+void createTriangle() {
+    float triangleVertices[] = {
+        0.0f,  0.5f, 0.0f,  
+       -0.5f, -0.5f, 0.0f,  
+        0.5f, -0.5f, 0.0f   
+    };
+
+    glGenVertexArrays(1, &triangleVAO);
+    glGenBuffers(1, &triangleVBO);
+    glBindVertexArray(triangleVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, triangleVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(triangleVertices), triangleVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+
+void movingTriangle(){
 
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &enemyVertexShaderSource, NULL);
@@ -91,17 +164,131 @@ void movingTriangle(){
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
-    enemyOffsetLocation = glGetUniformLocation(enemyShaderProgram, "offset");
-    
+    enemyTransformLocation = glGetUniformLocation(enemyShaderProgram, "transform");
+    enemyColorLocation = glGetUniformLocation(enemyShaderProgram, "color");
     srand(time(nullptr));
+
+    createSquare();
+    createCircle();
+    createTriangle();
+}
+
+static void drawPart(Shape shape, float cx, float cy, float px, float py, float w, float h, float angle, float r, float g, float b){
+    float aspect = (float)GameConfig::WINDOW_HEIGHT / GameConfig::WINDOW_WIDTH;
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(cx, cy, 0.0f));
+    model = glm::scale(model, glm::vec3(aspect, 1.0f, 1.0f));
+    model = glm::translate(model, glm::vec3(px, py, 0.0f));
+    model = glm::rotate(model, glm::radians(angle), glm::vec3(0.0f, 0.0f, 1.0f));
+    model = glm::scale(model, glm::vec3(w, h, 1.0f));
+    glUniformMatrix4fv(enemyTransformLocation, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform3f(enemyColorLocation, r, g, b);
+    if (shape == Shape::Square) {
+        glBindVertexArray(squareVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+    } else if (shape == Shape::Circle) {
+        glBindVertexArray(circleVAO);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, circleVertexCount);
+    } else if (shape == Shape::Triangle) {
+        glBindVertexArray(triangleVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+    }
+}
+
+void drawEasyEnemy(float x, float y, float animTime, bool attacking){
+    glUseProgram(enemyShaderProgram);
+    drawPart(Shape::Square, x, y, -0.015f, -0.08f, 0.02f, 0.08f, 0.0f, 0.78f, 0.88f, 0.23f); // left leg
+    drawPart(Shape::Square, x, y, 0.015f, -0.08f, 0.02f, 0.08f, 0.0f, 0.78f, 0.88f, 0.23f); // right leg
+    drawPart(Shape::Square, x, y, -0.018f, -0.125f, 0.032f, 0.015f, 0.0f, 0.07f, 0.07f, 0.07f); // left boot
+    drawPart(Shape::Square, x, y, 0.012f, -0.125f, 0.032f, 0.015f, 0.0f, 0.07f, 0.07f, 0.07f); // right boot
+    drawPart(Shape::Square, x, y, 0.0f, -0.035f, 0.06f, 0.03f, 0.0f, 0.12f, 0.16f, 0.27f); // shorts
+    drawPart(Shape::Square, x, y, 0.0f, 0.01f, 0.06f, 0.07f, 0.0f, 0.78f, 0.88f, 0.23f); // torso
+    drawPart(Shape::Square, x, y, 0.0f, 0.03f, 0.06f, 0.006f, 0.0f, 0.24f, 0.29f, 0.10f); // chest stripe
+    drawPart(Shape::Square, x, y, -0.038f, 0.01f, 0.016f, 0.06f, -20.0f, 0.78f, 0.88f, 0.23f); // left arm
+    drawPart(Shape::Square, x, y, 0.038f, 0.01f, 0.016f, 0.06f, 20.0f, 0.78f, 0.88f, 0.23f); // right arm
+    drawPart(Shape::Square, x, y, -0.045f, -0.025f, 0.032f, 0.032f, 0.0f, 0.95f, 0.95f, 0.95f); // left glove
+    drawPart(Shape::Square, x, y, 0.045f, -0.025f, 0.032f, 0.032f, 0.0f, 0.95f, 0.95f, 0.95f); // right glove
+    drawPart(Shape::Circle, x, y, 0.0f, 0.07f, 0.04f, 0.04f, 0.0f, 0.79f, 0.56f, 0.40f); // head
+    drawPart(Shape::Square, x, y, 0.0f, 0.06f, 0.038f, 0.014f, 0.0f, 0.17f, 0.11f, 0.08f); // beard
+    drawPart(Shape::Circle, x, y, 0.0f, 0.054f, 0.026f, 0.026f, 0.0f, 0.17f, 0.11f, 0.08f); // chin
+    drawPart(Shape::Square, x, y, 0.0f, 0.063f, 0.012f, 0.003f, 0.0f, 0.79f, 0.56f, 0.40f); // mouth
+    drawPart(Shape::Square, x, y, 0.0f, 0.085f, 0.04f, 0.012f, 0.0f, 0.17f, 0.11f, 0.08f); // hair
+    drawPart(Shape::Circle, x, y, -0.055f, -0.04f, 0.032f, 0.032f, 0.0f, 1.0f, 1.0f, 1.0f); // ball
+}
+
+void drawMediumEnemy(float x, float y, float animTime, bool attacking){
+    glUseProgram(enemyShaderProgram);
+    drawPart(Shape::Square, x, y, -0.014f, -0.08f, 0.02f, 0.08f, 0.0f, 0.64f, 0.07f, 0.23f); // left leg
+    drawPart(Shape::Square, x, y, 0.014f, -0.08f, 0.02f, 0.08f, 0.0f, 0.64f, 0.07f, 0.23f); // right leg
+    drawPart(Shape::Square, x, y, -0.014f, -0.095f, 0.024f, 0.03f, 0.0f, 0.94f, 0.94f, 0.94f); // left shin guard
+    drawPart(Shape::Square, x, y, 0.014f, -0.095f, 0.024f, 0.03f, 0.0f, 0.94f, 0.94f, 0.94f); // right shin guard
+    drawPart(Shape::Square, x, y, -0.019f, -0.125f, 0.034f, 0.015f, 0.0f, 0.95f, 0.76f, 0.0f); // left boot
+    drawPart(Shape::Square, x, y, 0.009f, -0.125f, 0.034f, 0.015f, 0.0f, 0.95f, 0.76f, 0.0f); // right boot
+    drawPart(Shape::Square, x, y, 0.0f, -0.03f, 0.058f, 0.03f, 0.0f, 0.11f, 0.24f, 0.56f); // shorts
+    drawPart(Shape::Square, x, y, 0.0f, 0.015f, 0.058f, 0.07f, 0.0f, 0.11f, 0.24f, 0.56f); // torso
+    drawPart(Shape::Square, x, y, -0.018f, 0.015f, 0.009f, 0.07f, 0.0f, 0.64f, 0.07f, 0.23f); // stripe 1
+    drawPart(Shape::Square, x, y, 0.0f, 0.015f, 0.009f, 0.07f, 0.0f, 0.64f, 0.07f, 0.23f); // stripe 2
+    drawPart(Shape::Square, x, y, 0.018f, 0.015f, 0.009f, 0.07f, 0.0f, 0.64f, 0.07f, 0.23f); // stripe 3
+    drawPart(Shape::Square, x, y, -0.04f, 0.02f, 0.015f, 0.055f, -45.0f, 0.11f, 0.24f, 0.56f); // left arm
+    drawPart(Shape::Square, x, y, 0.04f, 0.02f, 0.015f, 0.055f, 45.0f, 0.11f, 0.24f, 0.56f); // right arm
+    drawPart(Shape::Square, x, y, -0.054f, 0.006f, 0.016f, 0.007f, -45.0f, 0.94f, 0.94f, 0.94f); // left wristband
+    drawPart(Shape::Square, x, y, 0.054f, 0.006f, 0.016f, 0.007f, 45.0f, 0.94f, 0.94f, 0.94f); // right wristband
+    drawPart(Shape::Circle, x, y, -0.06f, 0.0f, 0.016f, 0.016f, 0.0f, 0.72f, 0.48f, 0.32f); // left hand
+    drawPart(Shape::Circle, x, y, 0.06f, 0.0f, 0.016f, 0.016f, 0.0f, 0.72f, 0.48f, 0.32f); // right hand
+    drawPart(Shape::Square, x, y, 0.027f, 0.078f, 0.012f, 0.016f, 50.0f, 0.10f, 0.07f, 0.05f); // ponytail
+    drawPart(Shape::Circle, x, y, 0.032f, 0.072f, 0.014f, 0.014f, 0.0f, 0.10f, 0.07f, 0.05f); // ponytail tip
+    drawPart(Shape::Circle, x, y, 0.0f, 0.075f, 0.04f, 0.04f, 0.0f, 0.72f, 0.48f, 0.32f); // head
+    drawPart(Shape::Square, x, y, 0.0f, 0.091f, 0.04f, 0.012f, 0.0f, 0.10f, 0.07f, 0.05f); // hair
+    drawPart(Shape::Square, x, y, 0.0f, 0.082f, 0.042f, 0.006f, 0.0f, 0.94f, 0.94f, 0.94f); // headband
+    drawPart(Shape::Circle, x, y, 0.021f, 0.084f, 0.012f, 0.012f, 0.0f, 0.94f, 0.94f, 0.94f); // hair tie
+    drawPart(Shape::Circle, x, y, -0.062f, -0.122f, 0.032f, 0.032f, 0.0f, 1.0f, 1.0f, 1.0f); // ball
+}
+
+void drawHardEnemy(float x, float y, float animTime, bool attacking){
+    glUseProgram(enemyShaderProgram);
+    drawPart(Shape::Square, x, y, 0.075f, 0.05f, 0.04f, 0.004f, 0.0f, 0.95f, 0.95f, 0.95f); // speed line 1
+    drawPart(Shape::Square, x, y, 0.085f, 0.02f, 0.04f, 0.004f, 0.0f, 0.95f, 0.95f, 0.95f); // speed line 2
+    drawPart(Shape::Square, x, y, 0.075f, -0.01f, 0.04f, 0.004f, 0.0f, 0.95f, 0.95f, 0.95f); // speed line 3
+    drawPart(Shape::Square, x, y, -0.005f, 0.045f, 0.016f, 0.045f, 115.0f, 0.08f, 0.16f, 0.42f); // back upper arm
+    drawPart(Shape::Square, x, y, 0.025f, 0.037f, 0.014f, 0.04f, 30.0f, 0.54f, 0.35f, 0.24f); // back forearm
+    drawPart(Shape::Circle, x, y, 0.035f, 0.02f, 0.016f, 0.016f, 0.0f, 0.54f, 0.35f, 0.24f); // back hand
+    drawPart(Shape::Square, x, y, 0.028f, -0.063f, 0.022f, 0.08f, 45.0f, 0.64f, 0.07f, 0.23f); // back leg
+    drawPart(Shape::Square, x, y, 0.058f, -0.094f, 0.036f, 0.016f, 30.0f, 1.0f, 0.23f, 0.19f); // back boot
+    drawPart(Shape::Square, x, y, -0.026f, -0.066f, 0.022f, 0.08f, -40.0f, 0.64f, 0.07f, 0.23f); // front leg
+    drawPart(Shape::Square, x, y, -0.056f, -0.098f, 0.036f, 0.016f, 0.0f, 1.0f, 0.23f, 0.19f); // front boot
+    drawPart(Shape::Square, x, y, -0.002f, -0.03f, 0.06f, 0.03f, 20.0f, 0.11f, 0.24f, 0.56f); // shorts
+    drawPart(Shape::Square, x, y, -0.017f, 0.012f, 0.062f, 0.075f, 20.0f, 0.11f, 0.24f, 0.56f); // torso
+    drawPart(Shape::Square, x, y, -0.036f, 0.005f, 0.01f, 0.075f, 20.0f, 0.64f, 0.07f, 0.23f); // stripe 1
+    drawPart(Shape::Square, x, y, -0.017f, 0.012f, 0.01f, 0.075f, 20.0f, 0.64f, 0.07f, 0.23f); // stripe 2
+    drawPart(Shape::Square, x, y, 0.002f, 0.019f, 0.01f, 0.075f, 20.0f, 0.64f, 0.07f, 0.23f); // stripe 3
+    drawPart(Shape::Circle, x, y, -0.039f, 0.073f, 0.042f, 0.042f, 0.0f, 0.54f, 0.35f, 0.24f); // head
+    drawPart(Shape::Square, x, y, -0.043f, 0.084f, 0.044f, 0.012f, 20.0f, 1.0f, 0.83f, 0.0f); // hair base
+    drawPart(Shape::Triangle, x, y, -0.062f, 0.089f, 0.014f, 0.024f, -15.0f, 1.0f, 0.83f, 0.0f); // spike 1
+    drawPart(Shape::Triangle, x, y, -0.054f, 0.096f, 0.014f, 0.024f, -15.0f, 1.0f, 0.83f, 0.0f); // spike 2
+    drawPart(Shape::Triangle, x, y, -0.045f, 0.1f, 0.014f, 0.024f, -15.0f, 1.0f, 0.83f, 0.0f); // spike 3
+    drawPart(Shape::Triangle, x, y, -0.034f, 0.1f, 0.014f, 0.024f, -15.0f, 1.0f, 0.83f, 0.0f); // spike 4
+    drawPart(Shape::Square, x, y, -0.051f, 0.075f, 0.013f, 0.003f, 0.0f, 0.16f, 0.10f, 0.06f); // angry brow
+    drawPart(Shape::Circle, x, y, -0.05f, 0.069f, 0.006f, 0.006f, 0.0f, 0.16f, 0.10f, 0.06f); // eye
+    drawPart(Shape::Square, x, y, -0.047f, 0.028f, 0.016f, 0.045f, -70.0f, 0.08f, 0.16f, 0.42f); // front upper arm
+    drawPart(Shape::Square, x, y, -0.073f, 0.04f, 0.014f, 0.04f, -165.0f, 0.54f, 0.35f, 0.24f); // front forearm
+    drawPart(Shape::Circle, x, y, -0.078f, 0.059f, 0.016f, 0.016f, 0.0f, 0.54f, 0.35f, 0.24f); // front hand
 }
 
 void drawTriangle(){
     glUseProgram(enemyShaderProgram);
-    glBindVertexArray(enemyVAO);
+    
     for (auto& enemy : enemies) {
         if (!enemy.alive) continue;
-        glUniform2f(enemyOffsetLocation, enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane]);
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], 0.0f));
+        glUniformMatrix4fv(enemyTransformLocation, 1, GL_FALSE, &(model[0][0]));
+        if (enemy.type == enemyType::Easy)
+            drawEasyEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], 0.0f, false);        
+        else if (enemy.type == enemyType::Medium)
+            drawMediumEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], 0.0f, false);
+        else
+            drawHardEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], 0.0f, false);    
+        drawHealthBar(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane] + 0.13f, enemy.health, enemy.maxHealth);        
         glDrawArrays(GL_TRIANGLES, 0, 3);
     }
 }
@@ -163,8 +350,9 @@ void updateEnemyPosition(float deltaTime) {
 
         enemy.x -= enemy.speed * deltaTime;
         if (enemy.x <= GameConfig::HOME_BASE_RIGHT) {
-            gameLost = true;
-            std::cout << "Game Over!" << std::endl;
+            //gameLost = true;  //Test
+            //std::cout << "Game Over!" << std::endl;  //Test
+            enemy.alive = false;  //Test
         }
     }
     bool anyAlive = false;
@@ -192,3 +380,4 @@ void resetEnemies() {
     spawnTimer = 0.0f;
     gameLost = false;
 }
+
