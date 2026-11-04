@@ -415,6 +415,7 @@ void Return_to_Main_Menu(GLFWwindow* window)
     {
         G_STATE = GAME_STATE::Main_Menu;
         playersReset();
+        worldReset();
     }
 }
 
