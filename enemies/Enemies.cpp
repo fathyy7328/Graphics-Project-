@@ -31,6 +31,16 @@ struct enemy {
     enemyType type;
     int health;
     int maxHealth;
+    float attackTimer;
+};
+
+struct projectile {
+    float x;
+    float y;
+    int lane;
+    float speed;
+    int damage;
+    bool alive;
 };
 
 static GLuint squareVAO = 0, squareVBO = 0;
@@ -49,6 +59,9 @@ static int currentWave = 0;
 static int spawnedEnemies = 0;
 static const int waves[] = { 3, 5, 10 };
 static bool gameLost = false;
+static const float ATTACK_INTERVAL = 3.0f;
+static std::vector<projectile> projectiles;
+static const float FAKE_PLAYER_X = GameConfig::PLAYER_START_X;
 
 
 static const char* enemyVertexShaderSource = R"(
@@ -282,6 +295,14 @@ void drawHardEnemy(float x, float y, float animTime, bool attacking){
 void drawTriangle(){
     glUseProgram(enemyShaderProgram);
     
+    glUseProgram(enemyShaderProgram);
+    glUniform1f(enemyDamageLocation, 0.0f);
+    for (auto& proj : projectiles) {
+        if (!proj.alive) continue;
+        drawPart(Shape::Circle, proj.x, proj.y, 0.0f, 0.0f, 0.025f, 0.025f, 0.0f, 1.0f, 1.0f, 1.0f);
+
+    }
+
     for (auto& enemy : enemies) {
         if (!enemy.alive) continue;
         
@@ -306,6 +327,7 @@ void spawnEnemy() {
     newEnemy.lane = rand() % GameConfig::LANE_COUNT;
     newEnemy.speed = ENEMY_SPEED;
     newEnemy.alive = true;
+    newEnemy.attackTimer = 0.0f;
     if (currentWave == 0){
         newEnemy.type = enemyType::Easy;
         newEnemy.health = 5; //test
@@ -354,14 +376,55 @@ void updateEnemyPosition(float deltaTime) {
     for (auto& enemy : enemies) {
         
         if (!enemy.alive) continue;
+        
+        //hard test
+        if (enemy.type == enemyType::Hard && enemy.x - FAKE_PLAYER_X <= 0.05f) {
+            enemy.attackTimer += deltaTime;
+            if (enemy.attackTimer >= ATTACK_INTERVAL) {
+                enemy.attackTimer = 0.0f;
+                std::cout << "Player in lane " << enemy.lane << " hit for 2" << std::endl;
+            }
+        }
+        else {
+            enemy.x -= enemy.speed * deltaTime;
+        }
 
-        enemy.x -= enemy.speed * deltaTime;
+
         if (enemy.x <= GameConfig::HOME_BASE_RIGHT) {
             //gameLost = true;  //Test
             //std::cout << "Game Over!" << std::endl;  //Test
             enemy.alive = false;  //Test
         }
+
+        if (enemy.type == enemyType::Easy || enemy.type == enemyType::Medium){
+            enemy.attackTimer += deltaTime;
+            if (enemy.attackTimer >= ATTACK_INTERVAL) {
+                enemy.attackTimer = 0.0f;
+                if (enemy.type == enemyType::Easy)
+                    projectiles.push_back({enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane] + 0.05f, enemy.lane, 0.5f, 1, true});
+                else if (enemy.type == enemyType::Medium)
+                    projectiles.push_back({enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane] - 0.12f, enemy.lane, 0.5f, 1, true});
+                }
+        } 
     }
+
+    for (auto& proj : projectiles) {
+        if (!proj.alive) continue;
+        proj.x -= proj.speed * deltaTime;
+
+        //Fake Player test
+        if (proj.x <= FAKE_PLAYER_X) {
+            proj.alive = false;
+            std::cout << "Player in lane " << proj.lane << " hit for " << proj.damage << std::endl;
+            continue;
+        }
+
+        if (proj.x <= GameConfig::HOME_BASE_RIGHT) {
+            proj.alive = false;
+        }
+    }
+    
+
     bool anyAlive = false;
     for (const auto& enemy : enemies) {
         if (enemy.alive) {
