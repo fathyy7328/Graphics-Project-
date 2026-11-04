@@ -152,14 +152,14 @@ int main()
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
     float vertices[] = {
-         0.5f,  0.5f, 0.0f,  // top right
-         0.5f, -0.5f, 0.0f,  // bottom right
-        -0.5f, -0.5f, 0.0f,  // bottom left
-        -0.5f,  0.5f, 0.0f   // top left 
+        0.675f, -0.517f, 0.0f,  // top right
+        0.675f, -0.733f, 0.0f,  // bottom right
+        -0.675f, -0.733f, 0.0f,  // bottom left
+        -0.675f, -0.517f, 0.0f   // top left
     };
     unsigned int indices[] = {  // note that we start from 0!
-        0, 1, 3,  // first Triangle
-        1, 2, 3   // second Triangle
+        0, 3, 1,
+        1, 3, 2  // second Triangle
     };
     unsigned int VBO, VAO, EBO;
     glGenVertexArrays(1, &VAO);
@@ -248,9 +248,14 @@ int main()
             glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
         }
         glClear(GL_COLOR_BUFFER_BIT);
+        
         if (G_STATE == GAME_STATE::Main_Menu)
-        {
+        {   
             drawDecorations();
+            glUseProgram(shaderProgram);
+            glBindVertexArray(VAO);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            glBindVertexArray(0);
             RenderText(
                 textShader,
                 "REAL MADRID VS BARCELONA",
@@ -260,7 +265,7 @@ int main()
             );
             RenderText(
                 textShader,
-                "Press Enter to Start The Game",
+                "Press Here to Start The Game",
                 150.0f, 100.0f,
                 0.85f,
                 glm::vec3(1.0f, 1.0f, 1.0f)
@@ -384,6 +389,32 @@ int main()
 void Open_Cutscene(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS && G_STATE == GAME_STATE::Main_Menu)
+    {
+        G_STATE = GAME_STATE::Cutscene;
+    }
+    double cursorX = 0.0;
+    double cursorY = 0.0;
+    glfwGetCursorPos(window, &cursorX, &cursorY);
+
+    int windowWidth = 0;
+    int windowHeight = 0;
+    glfwGetWindowSize(window, &windowWidth, &windowHeight);
+
+    const float mouseX =
+        static_cast<float>(2.0 * cursorX / windowWidth - 1.0);
+
+    const float mouseY =
+        static_cast<float>(1.0 - 2.0 * cursorY / windowHeight);
+
+    const bool insideStartButton =
+        mouseX >= -0.675f && mouseX <= 0.675f &&
+        mouseY >= -0.733f && mouseY <= -0.517f;
+
+    const bool leftButtonDown =
+        glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+
+    if (leftButtonDown && insideStartButton &&
+        G_STATE == GAME_STATE::Main_Menu)
     {
         G_STATE = GAME_STATE::Cutscene;
     }
