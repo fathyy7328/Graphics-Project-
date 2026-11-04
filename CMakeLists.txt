@@ -17,6 +17,7 @@ add_executable(GardenTowerDefense
     world/World.cpp
     src/Glad.cpp
     enemies/Enemies.cpp
+    players/Players.cpp
 )
 
 target_include_directories(GardenTowerDefense PRIVATE

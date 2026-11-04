@@ -15,6 +15,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <learnopengl/shader.h>
 #include "../enemies/Enemies.h"
+#include "../players/Players.h"
 
 GAME_STATE G_STATE = GAME_STATE::Main_Menu;
 bool escapeWasPressed = false;
@@ -105,6 +106,8 @@ int main()
     createHealthBar();
     createCards();
     movingTriangle();
+    playersInit();
+    
 
     // build and compile our shader program
     // ------------------------------------
@@ -268,14 +271,16 @@ int main()
           
         }
         if (G_STATE == GAME_STATE::Playing)
-
-          { updateEnemyPosition(deltaTime);
+          { 
+            updateEnemyPosition(deltaTime);
+            playersUpdate(deltaTime);
             drawBackground();
             drawLanes();
             drawDecorations();
             drawHomeBase();
             drawCards();
             drawTriangle();
+            playersDraw();
 
         }
         if (G_STATE == GAME_STATE::Cutscene)
@@ -409,6 +414,7 @@ void Return_to_Main_Menu(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS && G_STATE == GAME_STATE::Paused)
     {
         G_STATE = GAME_STATE::Main_Menu;
+        playersReset();
     }
 }
 
