@@ -64,7 +64,7 @@ static const float spawnInterval = 2.0f;
 static const float ENEMY_SPEED = 0.2f;
 static int currentWave = 0;
 static int spawnedEnemies = 0;
-static const int waves[] = { 3, 5, 10 };
+static const int waves[] = { 3, 5, 10 }; //test
 static bool gameLost = false;
 static const float ATTACK_INTERVAL = 3.0f;
 static std::vector<projectile> projectiles;
@@ -341,7 +341,7 @@ void spawnEnemy() {
     newEnemy.lane = rand() % GameConfig::LANE_COUNT;
     newEnemy.speed = ENEMY_SPEED;
     newEnemy.alive = true;
-    newEnemy.attackTimer = 0.0f;
+    newEnemy.attackTimer = ATTACK_INTERVAL; 
     if (currentWave == 0){
         newEnemy.type = enemyType::Easy;
         newEnemy.health = 5;
@@ -353,6 +353,8 @@ void spawnEnemy() {
                 newEnemy.type = enemyType::Easy;
             else
                 newEnemy.type = enemyType::Medium;
+        if (spawnedEnemies == 0)
+            newEnemy.type = enemyType::Medium;
         newEnemy.health = 5;
         newEnemy.maxHealth = newEnemy.health;
         
@@ -368,6 +370,22 @@ void spawnEnemy() {
                     newEnemy.type = enemyType::Hard;
                     newEnemy.speed = ENEMY_SPEED * 2.0f;
                 }       
+        if (spawnedEnemies == 0){
+            newEnemy.type = enemyType::Easy;
+            newEnemy.speed = ENEMY_SPEED;
+        }
+        else {
+            if (spawnedEnemies == 1){
+                newEnemy.type = enemyType::Medium;
+                newEnemy.speed = ENEMY_SPEED;
+            }
+            else{
+                if (spawnedEnemies == 2){
+                    newEnemy.type = enemyType::Hard;
+                    newEnemy.speed = ENEMY_SPEED * 2.0f;
+                }
+            }
+        }    
         newEnemy.health = (newEnemy.type == enemyType::Easy || newEnemy.type == enemyType::Medium) ? 5 : 7;
         newEnemy.maxHealth = newEnemy.health;   
     }
@@ -413,9 +431,11 @@ void updateEnemyPosition(float deltaTime) {
 
 
         if (enemy.x <= GameConfig::HOME_BASE_RIGHT) {
-            //gameLost = true;  //Test
-            //std::cout << "Game Over!" << std::endl;  //Test
-            enemy.alive = false;  //Test
+            gameLost = true;  //Test
+            std::cout << "Game Over!" << std::endl;  //Test
+            G_STATE = GAME_STATE::Lose; //Test
+            //enemy.alive = false;  //Test
+
         }
 
         if (enemy.type == enemyType::Easy || enemy.type == enemyType::Medium){
@@ -467,7 +487,9 @@ void updateEnemyPosition(float deltaTime) {
         if (currentWave < sizeof(waves) / sizeof(waves[0])) {
             std::cout << "Wave " << currentWave + 1 << " starting" << std::endl;        
         } else {
-            std::cout << "All waves cleared" << std::endl;          }
+            std::cout << "All waves cleared" << std::endl;  
+            G_STATE = GAME_STATE::Win; //TEST
+        }
         spawnedEnemies = 0;
         spawnTimer = 0.0f;
     }
