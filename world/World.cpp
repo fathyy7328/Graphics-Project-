@@ -9,6 +9,7 @@
 #include "World.h"
 #include "../Common.h"
 #include "../core/Menus.h"
+#include "../players/Players.h"
 
 GLuint laneVAO, laneVBO, laneShader;
 
@@ -829,6 +830,8 @@ void updateCards(GLFWwindow* window)
             selectedCard = hoveredCard;
     }
     cardMouseWasPressed = pressed;
+
+    updatePlacement(); 
 }
 
 int getSelectedCard()
@@ -839,6 +842,55 @@ int getSelectedCard()
 void resetCards()
 {
     hoveredCard = -1;
+    selectedCard = -1;
+}
+
+// ---------------- Placement ----------------
+
+// places the selected card's player on every selected lane, paying for each one
+void updatePlacement()
+{
+    if (selectedCard == -1)
+        return;
+    bool anyLaneSelected = false;
+    for (int lane = 0; lane < GameConfig::LANE_COUNT; lane++)
+    {
+        if (laneSelected[lane])
+            anyLaneSelected = true;
+    }
+    if (!anyLaneSelected)
+        return;
+
+    PlayerType type;
+    int price;
+    if (selectedCard == 0)
+    {
+        type = PlayerType::Melee;
+        price = GameConfig::MELEE_COST;
+    }
+    else if (selectedCard == 1)
+    {
+        type = PlayerType::Ranged;
+        price = GameConfig::RANGED_COST;
+    }
+    else
+    {
+        type = PlayerType::Defense;
+        price = GameConfig::DEFENSE_COST;
+    }
+
+    // one player on each selected lane, stop when there are not enough coins left
+    for (int lane = 0; lane < GameConfig::LANE_COUNT; lane++)
+    {
+        if (!laneSelected[lane])
+            continue;
+        if (!spendCoins(price))
+            break;
+
+        spawnPlayer(type, lane); 
+        if (type == PlayerType::Melee)
+            meleePlaced++; 
+    }
     selectedCard = -1;
 }
 

@@ -35,3 +35,4 @@ void resetCards();
 void createCoinCounter(); // called by createCards()
 void drawCoinCounter();   // called by drawCards()
 void deleteCoinCounter(); // called by deleteCards()
+void updatePlacement();   // called by updateCards()
