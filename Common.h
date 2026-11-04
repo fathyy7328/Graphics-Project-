@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <vector>
 
 // Shared top-level screen states used by the game modules.
 enum class GAME_STATE {
@@ -62,3 +63,7 @@ void drawHomeBase(); //use in cutscene
 
 // call to restart, coins go back to the start and no lane is selected.
 void worldReset();
+
+// Member 2 (world/World.cpp): adds one rectangle (2 triangles = 6 vertices) to a vertex list.
+// Each vertex is 6 floats: x, y, z, r, g, b. Positions use -1..1 and color is {r, g, b} from 0 to 1.
+void addRect(std::vector<float>& v, float left, float bottom, float right, float top, const float color[3]);
