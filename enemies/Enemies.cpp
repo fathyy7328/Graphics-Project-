@@ -43,6 +43,13 @@ struct projectile {
     bool alive;
 };
 
+struct droppedCoin{
+    float x;
+    float y;
+    float timer;
+    bool alive;
+};
+
 static GLuint squareVAO = 0, squareVBO = 0;
 static GLuint circleVAO = 0, circleVBO = 0;
 static int circleVertexCount = 0;
@@ -61,7 +68,8 @@ static const int waves[] = { 3, 5, 10 };
 static bool gameLost = false;
 static const float ATTACK_INTERVAL = 3.0f;
 static std::vector<projectile> projectiles;
-static const float FAKE_PLAYER_X = GameConfig::PLAYER_START_X;
+static const float FAKE_PLAYER_X = GameConfig::PLAYER_START_X; //fake player test
+static std::vector<droppedCoin> droppedCoins;
 
 
 static const char* enemyVertexShaderSource = R"(
@@ -303,6 +311,12 @@ void drawTriangle(){
 
     }
 
+    for (auto& coin : droppedCoins) {
+        if (!coin.alive) continue;
+        drawPart(Shape::Circle, coin.x, coin.y, 0, 0, 0.05f,  0.05f,  0, 0.72f, 0.55f, 0.12f);
+        drawPart(Shape::Circle, coin.x, coin.y, 0, 0, 0.036f, 0.036f, 0, 0.90f, 0.72f, 0.20f);
+    }
+
     for (auto& enemy : enemies) {
         if (!enemy.alive) continue;
         
@@ -330,7 +344,7 @@ void spawnEnemy() {
     newEnemy.attackTimer = 0.0f;
     if (currentWave == 0){
         newEnemy.type = enemyType::Easy;
-        newEnemy.health = 5; //test
+        newEnemy.health = 5;
         newEnemy.maxHealth = 5;
     }      
     else if (currentWave == 1){
@@ -377,6 +391,14 @@ void updateEnemyPosition(float deltaTime) {
         
         if (!enemy.alive) continue;
         
+        if (enemy.health <= 0) {
+            enemy.alive = false;
+            droppedCoins.push_back({enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], 0.0f, true});
+            std::cout << "Enemy in lane " << enemy.lane << " defeated" << std::endl;
+            continue;
+        }
+        //if (enemy.x <= 0.0f) enemy.health = 0;   // TEST
+
         //hard test
         if (enemy.type == enemyType::Hard && enemy.x - FAKE_PLAYER_X <= 0.05f) {
             enemy.attackTimer += deltaTime;
@@ -424,6 +446,14 @@ void updateEnemyPosition(float deltaTime) {
         }
     }
     
+    for (auto& coin : droppedCoins) {
+        if (!coin.alive) continue;
+        coin.timer += 0.1f *deltaTime;
+        if (coin.timer >= 1.5f) {
+            addCoins(GameConfig::COIN_VALUE);
+            coin.alive = false;
+        }
+    }
 
     bool anyAlive = false;
     for (const auto& enemy : enemies) {
@@ -449,5 +479,7 @@ void resetEnemies() {
     spawnedEnemies = 0;
     spawnTimer = 0.0f;
     gameLost = false;
+    droppedCoins.clear();
+    projectiles.clear();
 }
 
