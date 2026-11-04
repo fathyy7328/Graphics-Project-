@@ -245,7 +245,7 @@ int main()
         }
         else if (G_STATE == GAME_STATE::Lose)
         {
-            glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+            glClearColor(0.12f, 0.0f, 0.0f, 1.0f);
         }
         glClear(GL_COLOR_BUFFER_BIT);
         
@@ -351,6 +351,28 @@ int main()
             Return_to_Main_Menu(window);
             
 
+        }
+        if(G_STATE == GAME_STATE::Win)
+        {
+            drawDecorations();
+            RenderText(
+                textShader,
+                "Congratulations! You won!",
+                190.0f, 300.0f,
+                0.85f,
+                glm::vec3(1.0f, 0.84f, 0.0f)
+            );
+        }
+        if(G_STATE == GAME_STATE::Lose)
+        {
+            drawDecorations();
+            RenderText(
+                textShader,
+                "You lost. Hard luck next time.",
+                165.0f, 300.0f,
+                0.75f,
+                glm::vec3(1.0f, 0.0f, 0.0f)
+            );
         }
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
