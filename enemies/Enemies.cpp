@@ -32,6 +32,7 @@ struct enemy {
     int health;
     int maxHealth;
     float attackTimer;
+    float attackAnim;
 };
 
 struct projectile {
@@ -61,8 +62,8 @@ static GLint enemyDamageLocation = -1;
 static std::vector<enemy> enemies;
 static float spawnTimer = 0.0f;
 static const float spawnInterval = 2.0f;
-static const float ENEMY_SPEED = 0.2f;
-static int currentWave = 2; //test
+static const float ENEMY_SPEED = 0.1f;
+static int currentWave = 0; //test
 static int spawnedEnemies = 0;
 static const int waves[] = { 3, 5, 11 }; //test
 static bool gameLost = false;
@@ -250,6 +251,16 @@ void drawEasyEnemy(float x, float y, float animTime, bool attacking){
     float rad = glm::radians(swing);
     float footX = sin(rad) * 0.08f;
     float footY = cos(rad) * 0.08f;
+    float leftArmAngle = -20.0f;
+    float rightArmAngle = 20.0f;
+    if (attacking) {
+        leftArmAngle = -160.0f;
+        rightArmAngle = 160.0f;
+    }
+    float leftHandX  = sin(glm::radians(leftArmAngle))  * 0.06f;
+    float leftHandY  = cos(glm::radians(leftArmAngle))  * 0.06f;
+    float rightHandX = sin(glm::radians(rightArmAngle)) * 0.06f;
+    float rightHandY = cos(glm::radians(rightArmAngle)) * 0.06f;
     drawLimb(Shape::Square, x, y, -0.015f, -0.04f, 0.02f, 0.08f, swing, 0.78f, 0.88f, 0.23f); // left leg
     drawLimb(Shape::Square, x, y, 0.015f, -0.04f, 0.02f, 0.08f, -swing, 0.78f, 0.88f, 0.23f); // right leg
     drawPart(Shape::Square, x, y, -0.015f + footX, -0.04f - footY, 0.032f, 0.015f, swing, 0.07f, 0.07f, 0.07f); // left boot
@@ -257,32 +268,44 @@ void drawEasyEnemy(float x, float y, float animTime, bool attacking){
     drawPart(Shape::Square, x, y, 0.0f, -0.035f, 0.06f, 0.03f, 0.0f, 0.12f, 0.16f, 0.27f); // shorts
     drawPart(Shape::Square, x, y, 0.0f, 0.01f, 0.06f, 0.07f, 0.0f, 0.78f, 0.88f, 0.23f); // torso
     drawPart(Shape::Square, x, y, 0.0f, 0.03f, 0.06f, 0.006f, 0.0f, 0.24f, 0.29f, 0.10f); // chest stripe
-    drawPart(Shape::Square, x, y, -0.038f, 0.01f, 0.016f, 0.06f, -20.0f, 0.78f, 0.88f, 0.23f); // left arm
-    drawPart(Shape::Square, x, y, 0.038f, 0.01f, 0.016f, 0.06f, 20.0f, 0.78f, 0.88f, 0.23f); // right arm
-    drawPart(Shape::Square, x, y, -0.045f, -0.025f, 0.032f, 0.032f, 0.0f, 0.95f, 0.95f, 0.95f); // left glove
-    drawPart(Shape::Square, x, y, 0.045f, -0.025f, 0.032f, 0.032f, 0.0f, 0.95f, 0.95f, 0.95f); // right glove
+    drawLimb(Shape::Square, x, y, -0.028f, 0.038f, 0.016f, 0.06f, leftArmAngle, 0.78f, 0.88f, 0.23f); // left arm
+    drawLimb(Shape::Square, x, y, 0.028f, 0.038f, 0.016f, 0.06f, rightArmAngle, 0.78f, 0.88f, 0.23f); // right arm
+    drawPart(Shape::Square, x, y, -0.028f + leftHandX, 0.038f - leftHandY, 0.032f, 0.032f, 0.0f, 0.95f, 0.95f, 0.95f); // left glove
+    drawPart(Shape::Square, x, y, 0.028f + rightHandX, 0.038f - rightHandY, 0.032f, 0.032f, 0.0f, 0.95f, 0.95f, 0.95f); // right glove
     drawPart(Shape::Circle, x, y, 0.0f, 0.07f, 0.04f, 0.04f, 0.0f, 0.79f, 0.56f, 0.40f); // head
     drawPart(Shape::Square, x, y, 0.0f, 0.06f, 0.038f, 0.014f, 0.0f, 0.17f, 0.11f, 0.08f); // beard
     drawPart(Shape::Circle, x, y, 0.0f, 0.054f, 0.026f, 0.026f, 0.0f, 0.17f, 0.11f, 0.08f); // chin
     drawPart(Shape::Square, x, y, 0.0f, 0.063f, 0.012f, 0.003f, 0.0f, 0.79f, 0.56f, 0.40f); // mouth
     drawPart(Shape::Square, x, y, 0.0f, 0.085f, 0.04f, 0.012f, 0.0f, 0.17f, 0.11f, 0.08f); // hair
-    drawPart(Shape::Circle, x, y, -0.055f, -0.04f, 0.032f, 0.032f, 0.0f, 1.0f, 1.0f, 1.0f); // ball
+    if (attacking)
+        drawPart(Shape::Circle, x, y, 0.0f, 0.11f, 0.032f, 0.032f, 0.0f, 1.0f, 1.0f, 1.0f);     // ball above head
+    else
+        drawPart(Shape::Circle, x, y, -0.055f, -0.04f, 0.032f, 0.032f, 0.0f, 1.0f, 1.0f, 1.0f); // ball at his side
 }
 
 void drawMediumEnemy(float x, float y, float animTime, bool attacking){
     glUseProgram(enemyShaderProgram);
     float swing = sin(animTime *6.0f) * 20.0f;
-    float rad = glm::radians(swing);
-    float footX = sin(rad) * 0.08f;
-    float footY = cos(rad) * 0.08f;
-    float shinX = sin(rad) * 0.055f;
-    float shinY = cos(rad) * 0.055f;
-    drawLimb(Shape::Square, x, y, -0.014f, -0.04f, 0.02f, 0.08f, swing, 0.64f, 0.07f, 0.23f); // left leg
-    drawLimb(Shape::Square, x, y, 0.014f, -0.04f, 0.02f, 0.08f, -swing, 0.64f, 0.07f, 0.23f); // right leg
-    drawPart(Shape::Square, x, y, -0.014f + shinX, -0.04f - shinY, 0.024f, 0.03f, swing, 0.94f, 0.94f, 0.94f); // left shin guard
-    drawPart(Shape::Square, x, y, 0.014f - shinX, -0.04f - shinY, 0.024f, 0.03f, -swing, 0.94f, 0.94f, 0.94f); // right shin guard
-    drawPart(Shape::Square, x, y, -0.014f + footX, -0.04f - footY, 0.034f, 0.015f, 0.0f, 0.95f, 0.76f, 0.0f); // left boot
-    drawPart(Shape::Square, x, y, 0.014f - footX, -0.04f - footY, 0.034f, 0.015f, 0.0f, 0.95f, 0.76f, 0.0f); // right boot
+    float leftLegAngle = swing;
+    float rightLegAngle = -swing;
+    if (attacking) {
+        leftLegAngle = -60.0f;
+        rightLegAngle = 0.0f;
+    }
+    float leftFootX  = sin(glm::radians(leftLegAngle))  * 0.08f;
+    float leftFootY  = cos(glm::radians(leftLegAngle))  * 0.08f;
+    float rightFootX = sin(glm::radians(rightLegAngle)) * 0.08f;
+    float rightFootY = cos(glm::radians(rightLegAngle)) * 0.08f;
+    float leftShinX  = sin(glm::radians(leftLegAngle))  * 0.055f;
+    float leftShinY  = cos(glm::radians(leftLegAngle))  * 0.055f;
+    float rightShinX = sin(glm::radians(rightLegAngle)) * 0.055f;
+    float rightShinY = cos(glm::radians(rightLegAngle)) * 0.055f;
+    drawLimb(Shape::Square, x, y, -0.014f, -0.04f, 0.02f, 0.08f, leftLegAngle, 0.64f, 0.07f, 0.23f); // left leg
+    drawLimb(Shape::Square, x, y, 0.014f, -0.04f, 0.02f, 0.08f, rightLegAngle, 0.64f, 0.07f, 0.23f); // right leg
+    drawPart(Shape::Square, x, y, -0.014f + leftShinX, -0.04f - leftShinY, 0.024f, 0.03f, leftLegAngle, 0.94f, 0.94f, 0.94f); // left shin guard
+    drawPart(Shape::Square, x, y, 0.014f + rightShinX, -0.04f - rightShinY, 0.024f, 0.03f, rightLegAngle, 0.94f, 0.94f, 0.94f); // right shin guard
+    drawPart(Shape::Square, x, y, 0.014f + rightFootX, -0.04f - rightFootY, 0.034f, 0.015f, rightLegAngle, 0.95f, 0.76f, 0.0f); // right boot
+    drawPart(Shape::Square, x, y, -0.014f + leftFootX, -0.04f - leftFootY, 0.034f, 0.015f, leftLegAngle, 0.95f, 0.76f, 0.0f); // left boot
     drawPart(Shape::Square, x, y, 0.0f, -0.03f, 0.058f, 0.03f, 0.0f, 0.11f, 0.24f, 0.56f); // shorts
     drawPart(Shape::Square, x, y, 0.0f, 0.015f, 0.058f, 0.07f, 0.0f, 0.11f, 0.24f, 0.56f); // torso
     drawPart(Shape::Square, x, y, -0.018f, 0.015f, 0.009f, 0.07f, 0.0f, 0.64f, 0.07f, 0.23f); // stripe 1
@@ -300,7 +323,8 @@ void drawMediumEnemy(float x, float y, float animTime, bool attacking){
     drawPart(Shape::Square, x, y, 0.0f, 0.091f, 0.04f, 0.012f, 0.0f, 0.10f, 0.07f, 0.05f); // hair
     drawPart(Shape::Square, x, y, 0.0f, 0.082f, 0.042f, 0.006f, 0.0f, 0.94f, 0.94f, 0.94f); // headband
     drawPart(Shape::Circle, x, y, 0.021f, 0.084f, 0.012f, 0.012f, 0.0f, 0.94f, 0.94f, 0.94f); // hair tie
-    drawPart(Shape::Circle, x, y, -0.062f, -0.122f, 0.032f, 0.032f, 0.0f, 1.0f, 1.0f, 1.0f); // ball
+    if (!attacking)
+        drawPart(Shape::Circle, x, y, -0.062f, -0.122f, 0.032f, 0.032f, 0.0f, 1.0f, 1.0f, 1.0f); // ball
 }
 
 void drawHardEnemy(float x, float y, float animTime, bool attacking){
@@ -308,10 +332,17 @@ void drawHardEnemy(float x, float y, float animTime, bool attacking){
     float swing = sin(animTime * 14.0f) * 15.0f;
     float backAngle = 45.0f + swing;
     float frontAngle = -40.0f - swing;
+
+    if (attacking) {            
+        frontAngle = -85.0f;
+        backAngle = 30.0f;
+        y -= 0.05f;
+    }
+
     float backFootX = sin(glm::radians(backAngle)) * 0.08f;
     float backFootY = cos(glm::radians(backAngle)) * 0.08f;
     float frontFootX = sin(glm::radians(frontAngle)) * 0.08f;
-    float frontFootY = cos(glm::radians(frontAngle)) * 0.08f;
+float frontFootY = cos(glm::radians(frontAngle)) * 0.08f;
     drawPart(Shape::Square, x, y, 0.075f, 0.05f, 0.04f, 0.004f, 0.0f, 0.95f, 0.95f, 0.95f); // speed line 1
     drawPart(Shape::Square, x, y, 0.085f, 0.02f, 0.04f, 0.004f, 0.0f, 0.95f, 0.95f, 0.95f); // speed line 2
     drawPart(Shape::Square, x, y, 0.075f, -0.01f, 0.04f, 0.004f, 0.0f, 0.95f, 0.95f, 0.95f); // speed line 3
@@ -368,11 +399,11 @@ void drawTriangle(){
         glUseProgram(enemyShaderProgram);
         glUniform1f(enemyDamageLocation, damage);
         if (enemy.type == enemyType::Easy)
-            drawEasyEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], t, false);        
+            drawEasyEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], t, enemy.attackAnim > 0.0f);        
         else if (enemy.type == enemyType::Medium)
-            drawMediumEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], t, false);
+            drawMediumEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], t, enemy.attackAnim > 0.0f);
         else
-            drawHardEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], t, false);    
+            drawHardEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], t, enemy.attackAnim > 0.0f);    
         drawHealthBar(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane] + 0.13f, enemy.health, enemy.maxHealth);        
     }
 }
@@ -384,6 +415,8 @@ void spawnEnemy() {
     newEnemy.speed = ENEMY_SPEED;
     newEnemy.alive = true;
     newEnemy.attackTimer = ATTACK_INTERVAL; 
+    spawnEnemy: newEnemy.attackAnim = 0.0f;
+
     if (currentWave == 0){
         newEnemy.type = enemyType::Easy;
         newEnemy.health = 5;
@@ -457,6 +490,11 @@ void updateEnemyPosition(float deltaTime) {
             std::cout << "Enemy in lane " << enemy.lane << " defeated" << std::endl;
             continue;
         }
+
+        if (enemy.attackAnim > 0) {
+            enemy.attackAnim -= deltaTime;
+        }
+
         //if (enemy.x <= 0.0f) enemy.health = 0;   // TEST
 
         //hard test
@@ -464,6 +502,7 @@ void updateEnemyPosition(float deltaTime) {
             enemy.attackTimer += deltaTime;
             if (enemy.attackTimer >= ATTACK_INTERVAL) {
                 enemy.attackTimer = 0.0f;
+                enemy.attackAnim = 0.3f;
                 std::cout << "Player in lane " << enemy.lane << " hit for 2" << std::endl;
             }
         }
@@ -484,6 +523,7 @@ void updateEnemyPosition(float deltaTime) {
             enemy.attackTimer += deltaTime;
             if (enemy.attackTimer >= ATTACK_INTERVAL) {
                 enemy.attackTimer = 0.0f;
+                enemy.attackAnim = 0.3f;
                 if (enemy.type == enemyType::Easy)
                     projectiles.push_back({enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane] + 0.05f, enemy.lane, 0.5f, 1, true});
                 else if (enemy.type == enemyType::Medium)
