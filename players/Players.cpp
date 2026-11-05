@@ -9,6 +9,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+bool isLaneSelected(int lane);   // defined in M2's World.cpp
+
 enum class PlayerAction {
     None,
     Jumping,
@@ -32,9 +34,25 @@ struct Player {
     int maxHealth;
     PlayerAction action;
     float actionTimer;
+    float animTimer;     // R3.5: drives the walking leg swing
+    float swingTimer;    // R3.6: drives the melee weapon swing
+    bool inCombat;       // R3.6 / R3.12: true while fighting an enemy
+    float fireTimer;     // R3.7 / R3.15: time since the ranged player last fired
+};
+
+// R3.15: a ball fired by a ranged player
+struct PlayerProjectile {
+    float x;
+    float y;
+    int lane;
+    int damage;          // always 1 (R3.16)
+    bool alive;
+    bool hitting;        // true while the hit effect is playing
+    float hitTimer;
 };
 
 static std::vector<Player> players;
+static std::vector<PlayerProjectile> playerProjectiles;
 static GLuint quadVAO = 0, quadVBO = 0, quadEBO = 0;
 static GLuint circleVAO = 0, circleVBO = 0;
 static int circleVertexCount = 0;
@@ -47,6 +65,21 @@ static GLint playerDamageLocation = -1;
 static const float ACTION_DURATION = 0.6f;
 static const float JUMP_HEIGHT = 0.05f;
 static const float DUCK_DEPTH = 0.05f;
+static const float WALK_SWING_SPEED = 6.0f;    // how fast the legs swing
+static const float WALK_SWING_ANGLE = 20.0f;   // how far the legs swing (degrees)
+static const float LEG_LENGTH = 0.07f;
+static const float MELEE_SHOULDER_X = 0.028f;    // where the front arm is attached
+static const float MELEE_SHOULDER_Y = 0.035f;
+static const float MELEE_SWING_SPEED = 6.0f;     // how fast the weapon swings
+static const float MELEE_SWING_CENTER = 25.0f;   // middle of the swing (degrees)
+static const float MELEE_SWING_RANGE = 45.0f;    // swings 45 degrees each way: from -20 to 70
+static const float MELEE_HOLD_ANGLE = 45.0f;     // arm angle while walking (weapon held still)
+static const float RANGED_FIRE_INTERVAL = 1.5f;  // seconds between two shots
+static const float RANGED_FIRE_ANIM = 0.25f;     // R3.7: how long the header animation lasts
+static const float RANGED_RELOAD_ANIM = 0.35f;   // R3.7: how long the new ball takes to drop back onto the head
+static const float PROJECTILE_SPEED = 0.6f;      // how fast the ball flies right
+static const float PROJECTILE_SIZE = 0.026f;
+static const float HIT_EFFECT_TIME = 0.2f;       // R3.15: how long the hit "pop" lasts
 
 static bool jumpKeyWasPressed = false;
 static bool duckKeyWasPressed = false;
@@ -142,6 +175,8 @@ static void createPlayerTriangle() {
     glBindVertexArray(0);
 }
 
+// Same idea as M4's drawPart: (cx, cy) = where the player stands,
+// (px, py) = where this part sits on the body, w/h = size, angle = rotation, r/g/b = color.
 static void drawPart(PlayerShape shape, float cx, float cy, float px, float py,
                      float w, float h, float angle, float r, float g, float b) {
     float aspect = (float)GameConfig::WINDOW_HEIGHT / GameConfig::WINDOW_WIDTH;
@@ -168,44 +203,142 @@ static void drawPart(PlayerShape shape, float cx, float cy, float px, float py,
     }
 }
 
-// Melee
-static void drawMeleePlayer(float x, float y) {
-    drawPart(PlayerShape::Square, x, y, -0.014f, -0.085f, 0.020f, 0.070f,   0.0f, 0.88f, 0.88f, 0.88f); // back leg
-    drawPart(PlayerShape::Square, x, y, -0.008f, -0.125f, 0.032f, 0.015f,   0.0f, 0.08f, 0.08f, 0.08f); // back boot
+// Same as drawPart, but the part rotates around its TOP end (hip / shoulder) instead of its center.
+// (px, py) is the top end. Same idea as M4's drawLimb.
+static void drawLimb(PlayerShape shape, float cx, float cy, float px, float py,
+                     float w, float h, float angle, float r, float g, float b) {
+    float aspect = (float)GameConfig::WINDOW_HEIGHT / GameConfig::WINDOW_WIDTH;
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(cx, cy, 0.0f));
+    model = glm::scale(model, glm::vec3(aspect, 1.0f, 1.0f));
+    model = glm::translate(model, glm::vec3(px, py, 0.0f));
+    model = glm::rotate(model, glm::radians(angle), glm::vec3(0.0f, 0.0f, 1.0f));
+    model = glm::translate(model, glm::vec3(0.0f, -h / 2.0f, 0.0f));
+    model = glm::scale(model, glm::vec3(w, h, 1.0f));
+    glUniformMatrix4fv(playerTransformLocation, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform4f(playerColorLocation, r, g, b, 1.0f);
+
+    if (shape == PlayerShape::Square) {
+        glBindVertexArray(quadVAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    }
+    else if (shape == PlayerShape::Circle) {
+        glBindVertexArray(circleVAO);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, circleVertexCount);
+    }
+    else {
+        glBindVertexArray(triangleVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+    }
+}
+
+// R3.6: like drawPart, but first moves to the shoulder and rotates by armAngle,
+// so the arm, hand and weapon all turn around the shoulder together.
+// (px, py) is measured from the shoulder, as if the arm were hanging straight down.
+static void drawArmPart(PlayerShape shape, float cx, float cy, float armAngle, float px, float py,
+                        float w, float h, float angle, float r, float g, float b) {
+    float aspect = (float)GameConfig::WINDOW_HEIGHT / GameConfig::WINDOW_WIDTH;
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(cx, cy, 0.0f));
+    model = glm::scale(model, glm::vec3(aspect, 1.0f, 1.0f));
+    model = glm::translate(model, glm::vec3(MELEE_SHOULDER_X, MELEE_SHOULDER_Y, 0.0f));
+    model = glm::rotate(model, glm::radians(armAngle), glm::vec3(0.0f, 0.0f, 1.0f));
+    model = glm::translate(model, glm::vec3(px, py, 0.0f));
+    model = glm::rotate(model, glm::radians(angle), glm::vec3(0.0f, 0.0f, 1.0f));
+    model = glm::scale(model, glm::vec3(w, h, 1.0f));
+    glUniformMatrix4fv(playerTransformLocation, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform4f(playerColorLocation, r, g, b, 1.0f);
+
+    if (shape == PlayerShape::Square) {
+        glBindVertexArray(quadVAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    }
+    else if (shape == PlayerShape::Circle) {
+        glBindVertexArray(circleVAO);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, circleVertexCount);
+    }
+    else {
+        glBindVertexArray(triangleVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+    }
+}
+
+// R3.5: two legs that swing around the hip, with a boot at the end of each leg
+static void drawWalkingLegs(float x, float y, float swing,
+                            float backR, float backG, float backB,
+                            float frontR, float frontG, float frontB) {
+    float rad = glm::radians(swing);
+    float footX = sin(rad) * LEG_LENGTH;   // where the bottom of the leg ends up
+    float footY = cos(rad) * LEG_LENGTH;
+
+    drawLimb(PlayerShape::Square, x, y, -0.014f, -0.050f, 0.020f, LEG_LENGTH, swing, backR, backG, backB);                // back leg
+    drawPart(PlayerShape::Square, x, y, -0.014f + footX + 0.006f, -0.050f - footY - 0.005f, 0.032f, 0.015f, swing, 0.08f, 0.08f, 0.08f);  // back boot
+    drawLimb(PlayerShape::Square, x, y,  0.014f, -0.050f, 0.020f, LEG_LENGTH, -swing, frontR, frontG, frontB);           // front leg
+    drawPart(PlayerShape::Square, x, y,  0.014f - footX + 0.006f, -0.050f - footY - 0.005f, 0.032f, 0.015f, -swing, 0.08f, 0.08f, 0.08f); // front boot
+}
+
+// R3.1 Melee: blond midfielder with a corner-flag spear
+static void drawMeleePlayer(float x, float y, float swing, float armAngle) {
+    drawWalkingLegs(x, y, swing, 0.88f, 0.88f, 0.88f, 0.98f, 0.98f, 0.98f);                                 // legs + boots (R3.5)
     drawPart(PlayerShape::Square, x, y, -0.034f,  0.000f, 0.016f, 0.055f,  10.0f, 0.82f, 0.82f, 0.86f); // back arm
-    drawPart(PlayerShape::Square, x, y,  0.014f, -0.085f, 0.020f, 0.070f,   0.0f, 0.98f, 0.98f, 0.98f); // front leg
-    drawPart(PlayerShape::Square, x, y,  0.020f, -0.125f, 0.032f, 0.015f,   0.0f, 0.08f, 0.08f, 0.08f); // front boot
     drawPart(PlayerShape::Square, x, y,  0.000f, -0.040f, 0.060f, 0.030f,   0.0f, 0.96f, 0.96f, 0.96f); // shorts
     drawPart(PlayerShape::Square, x, y,  0.000f,  0.010f, 0.060f, 0.070f,   0.0f, 1.00f, 1.00f, 1.00f); // shirt
     drawPart(PlayerShape::Square, x, y,  0.000f,  0.042f, 0.030f, 0.006f,   0.0f, 0.85f, 0.70f, 0.20f); // gold collar
     drawPart(PlayerShape::Circle, x, y, -0.005f,  0.078f, 0.048f, 0.044f,   0.0f, 0.95f, 0.80f, 0.25f); // blond hair
     drawPart(PlayerShape::Circle, x, y,  0.000f,  0.070f, 0.042f, 0.042f,   0.0f, 0.96f, 0.80f, 0.66f); // head
     drawPart(PlayerShape::Circle, x, y,  0.012f,  0.072f, 0.006f, 0.006f,   0.0f, 0.10f, 0.07f, 0.05f); // eye
-    drawPart(PlayerShape::Square, x, y,  0.046f,  0.017f, 0.016f, 0.050f,  45.0f, 0.82f, 0.82f, 0.86f); // front arm
-    drawPart(PlayerShape::Square, x, y,  0.088f,  0.024f, 0.090f, 0.007f,  45.0f, 0.75f, 0.75f, 0.78f); // flag pole
-    drawPart(PlayerShape::Triangle, x, y, 0.100f, 0.056f, 0.026f, 0.030f, -45.0f, 0.55f, 0.25f, 0.75f); // pennant
-    drawPart(PlayerShape::Circle, x, y,  0.063f,  0.000f, 0.017f, 0.017f,   0.0f, 0.96f, 0.80f, 0.66f); // hand
+    // R3.6: these 4 parts turn around the shoulder by armAngle, so the weapon swings in the hand
+    drawArmPart(PlayerShape::Square,   x, y, armAngle, 0.000f, -0.025f, 0.016f, 0.050f,   0.0f, 0.82f, 0.82f, 0.86f); // front arm
+    drawArmPart(PlayerShape::Square,   x, y, armAngle, 0.035f, -0.050f, 0.090f, 0.007f,   0.0f, 0.75f, 0.75f, 0.78f); // flag pole
+    drawArmPart(PlayerShape::Triangle, x, y, armAngle, 0.066f, -0.036f, 0.026f, 0.030f, -90.0f, 0.55f, 0.25f, 0.75f); // pennant
+    drawArmPart(PlayerShape::Circle,   x, y, armAngle, 0.000f, -0.050f, 0.017f, 0.017f,   0.0f, 0.96f, 0.80f, 0.66f); // hand
 }
 
-// Ranged
-static void drawRangedPlayer(float x, float y) {
-    drawPart(PlayerShape::Square, x, y, -0.014f, -0.085f, 0.020f, 0.070f,   0.0f, 0.88f, 0.88f, 0.88f); // back leg
-    drawPart(PlayerShape::Square, x, y, -0.008f, -0.125f, 0.032f, 0.015f,   0.0f, 0.08f, 0.08f, 0.08f); // back boot
-    drawPart(PlayerShape::Square, x, y,  0.014f, -0.085f, 0.020f, 0.070f,   0.0f, 0.98f, 0.98f, 0.98f); // front leg
-    drawPart(PlayerShape::Square, x, y,  0.020f, -0.125f, 0.032f, 0.015f,   0.0f, 0.08f, 0.08f, 0.08f); // front boot
+// R3.2 Ranged: striker with a ball above his head
+// R3.7: nod (0..1) = how far into the header he is; ballLift = how high the new ball still is; showBall = false right after firing
+static void drawRangedPlayer(float x, float y, float swing, float nod, float ballLift, bool showBall) {
+    float headX = 0.010f * nod;     // the head moves forward ...
+    float headY = -0.006f * nod;    // ... and a little down, like heading a ball
+    float armOut = 25.0f * nod;     // the arms flare out for balance
+
+    drawWalkingLegs(x, y, swing, 0.88f, 0.88f, 0.88f, 0.98f, 0.98f, 0.98f);                                 // legs + boots (R3.5)
     drawPart(PlayerShape::Square, x, y,  0.000f, -0.040f, 0.060f, 0.030f,   0.0f, 0.96f, 0.96f, 0.96f); // shorts
-    drawPart(PlayerShape::Square, x, y, -0.036f,  0.005f, 0.016f, 0.050f, -25.0f, 0.82f, 0.82f, 0.86f); // back arm out
+    drawPart(PlayerShape::Square, x, y, -0.036f,  0.005f, 0.016f, 0.050f, -25.0f - armOut, 0.82f, 0.82f, 0.86f); // back arm out
     drawPart(PlayerShape::Square, x, y,  0.000f,  0.010f, 0.060f, 0.070f,   0.0f, 1.00f, 1.00f, 1.00f); // shirt
     drawPart(PlayerShape::Square, x, y,  0.000f,  0.042f, 0.030f, 0.006f,   0.0f, 0.85f, 0.70f, 0.20f); // gold collar
-    drawPart(PlayerShape::Square, x, y,  0.036f,  0.005f, 0.016f, 0.050f,  25.0f, 0.82f, 0.82f, 0.86f); // front arm out
-    drawPart(PlayerShape::Circle, x, y,  0.000f,  0.070f, 0.042f, 0.042f,   0.0f, 0.36f, 0.24f, 0.16f); // head
-    drawPart(PlayerShape::Square, x, y, -0.002f,  0.088f, 0.042f, 0.012f,   0.0f, 0.05f, 0.05f, 0.05f); // black hair
-    drawPart(PlayerShape::Circle, x, y,  0.012f,  0.072f, 0.006f, 0.006f,   0.0f, 0.10f, 0.07f, 0.05f); // eye
-    drawPart(PlayerShape::Circle, x, y,  0.000f,  0.113f, 0.026f, 0.026f,   0.0f, 1.00f, 1.00f, 1.00f); // ball
-    drawPart(PlayerShape::Circle, x, y,  0.000f,  0.113f, 0.010f, 0.010f,   0.0f, 0.15f, 0.15f, 0.15f); // ball patch
+    drawPart(PlayerShape::Square, x, y,  0.036f,  0.005f, 0.016f, 0.050f,  25.0f + armOut, 0.82f, 0.82f, 0.86f); // front arm out
+    drawPart(PlayerShape::Circle, x, y,  0.000f + headX,  0.070f + headY, 0.042f, 0.042f, 0.0f, 0.36f, 0.24f, 0.16f); // head
+    drawPart(PlayerShape::Square, x, y, -0.002f + headX,  0.088f + headY, 0.042f, 0.012f, 0.0f, 0.05f, 0.05f, 0.05f); // black hair
+    drawPart(PlayerShape::Circle, x, y,  0.012f,  0.072f, 0.006f, 0.006f,   0.0f, 0.10f, 0.07f, 0.05f); // eye (stays still)
+    if (showBall) {
+        drawPart(PlayerShape::Circle, x, y, 0.000f, 0.113f + ballLift, 0.026f, 0.026f, 0.0f, 1.00f, 1.00f, 1.00f); // ball
+        drawPart(PlayerShape::Circle, x, y, 0.000f, 0.113f + ballLift, 0.010f, 0.010f, 0.0f, 0.15f, 0.15f, 0.15f); // ball patch
+    }
 }
 
-// Defense
+// R3.15: a flying ball, or the "pop" effect when it hits
+static void drawPlayerProjectile(const PlayerProjectile& b) {
+    if (!b.hitting) {
+        drawPart(PlayerShape::Circle, b.x, b.y, 0.0f, 0.0f, PROJECTILE_SIZE * 1.2f, PROJECTILE_SIZE * 1.2f, 0.0f, 0.15f, 0.15f, 0.15f); // outline
+        drawPart(PlayerShape::Circle, b.x, b.y, 0.0f, 0.0f, PROJECTILE_SIZE, PROJECTILE_SIZE, 0.0f, 1.00f, 1.00f, 1.00f);               // ball
+        drawPart(PlayerShape::Circle, b.x, b.y, 0.0f, 0.0f, PROJECTILE_SIZE * 0.4f, PROJECTILE_SIZE * 0.4f, 0.0f, 0.15f, 0.15f, 0.15f); // patch
+        return;
+    }
+
+    // hit effect: the ball grows while 4 small sparks fly outward
+    float t = b.hitTimer / HIT_EFFECT_TIME;          // 0 -> 1
+    float size = PROJECTILE_SIZE * (1.0f + t);
+    float dist = 0.02f + 0.04f * t;
+    drawPart(PlayerShape::Circle, b.x, b.y, 0.0f, 0.0f, size, size, 0.0f, 1.00f, 1.00f, 1.00f);
+    for (int i = 0; i < 4; i++) {
+        float dir = 45.0f + i * 90.0f;               // 45, 135, 225, 315 degrees
+        float rad = glm::radians(dir);
+        drawPart(PlayerShape::Triangle, b.x, b.y, cos(rad) * dist, sin(rad) * dist,
+                 0.012f, 0.024f, dir - 90.0f, 1.00f, 0.90f, 0.30f);
+    }
+}
+
+// R3.3 Defense: commander with a big shield
 static void drawDefensePlayer(float x, float y) {
     drawPart(PlayerShape::Square, x, y, -0.016f, -0.085f, 0.020f, 0.070f,  0.0f, 0.10f, 0.12f, 0.25f); // back leg
     drawPart(PlayerShape::Square, x, y, -0.012f, -0.120f, 0.030f, 0.025f,  0.0f, 0.08f, 0.08f, 0.08f); // back boot
@@ -234,6 +367,10 @@ void spawnPlayer(PlayerType type, int lane) {
     p.alive = true;
     p.action = PlayerAction::None;
     p.actionTimer = 0.0f;
+    p.animTimer = 0.0f;
+    p.swingTimer = 0.0f;
+    p.inCombat = false;
+    p.fireTimer = RANGED_FIRE_ANIM + RANGED_RELOAD_ANIM;   // start with the ball resting on the head
 
     if (type == PlayerType::Melee) {
         p.health = 5;
@@ -291,28 +428,33 @@ void playersInit() {
     createPlayerQuad();
     createPlayerCircle();
     createPlayerTriangle();
-
-    // TEST ONLY: remove when M2's cards call spawnPlayer
-    spawnPlayer(PlayerType::Melee, 0);
-    spawnPlayer(PlayerType::Ranged, 1);
-    spawnPlayer(PlayerType::Defense, 2);
 }
 
 void playersUpdate(float dt) {
-    // TEST ONLY: remove when M2 calls jumpLane / duckLane
+    // W / Up = jump, S / Down = duck, only in the lanes selected with the mouse (R2.7 / R3.14)
     GLFWwindow* window = glfwGetCurrentContext();
     bool jumpKey = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS;
     bool duckKey = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS;
     if (jumpKey && !jumpKeyWasPressed) {
-        for (int lane = 0; lane < GameConfig::LANE_COUNT; lane++) jumpLane(lane);
+        for (int lane = 0; lane < GameConfig::LANE_COUNT; lane++) {
+            if (isLaneSelected(lane)) {
+                jumpLane(lane);
+            }
+        }
     }
     if (duckKey && !duckKeyWasPressed) {
-        for (int lane = 0; lane < GameConfig::LANE_COUNT; lane++) duckLane(lane);
+        for (int lane = 0; lane < GameConfig::LANE_COUNT; lane++) {
+            if (isLaneSelected(lane)) {
+                duckLane(lane);
+            }
+        }
     }
     jumpKeyWasPressed = jumpKey;
     duckKeyWasPressed = duckKey;
 
     for (Player& p : players) {
+        float oldX = p.x;
+
         if (p.type != PlayerType::Defense) {
             p.x += p.speed * dt;
         }
@@ -320,6 +462,41 @@ void playersUpdate(float dt) {
         float maxX = GameConfig::PLAYFIELD_RIGHT - 0.05f;
         if (p.x > maxX) {
             p.x = maxX;
+        }
+
+        // R3.5: legs only swing while the player is actually moving
+        if (p.x != oldX) {
+            p.animTimer += dt;
+        }
+
+        // TEMPORARY TEST until R3.12: a player that reached the right edge counts as "in combat".
+        // R3.12 will replace this with: in combat = touching an enemy in the same lane.
+        p.inCombat = (p.x >= maxX);
+
+        // R3.6: the melee weapon swings only during combat; otherwise the arm stays still
+        if (p.type == PlayerType::Melee && p.inCombat) {
+            p.swingTimer += dt;
+        }
+        else {
+            p.swingTimer = 0.0f;
+        }
+
+        // R3.7 / R3.15 / R3.9: the ranged player fires a ball every RANGED_FIRE_INTERVAL seconds, enemy or not
+        if (p.type == PlayerType::Ranged) {
+            p.fireTimer += dt;
+            if (p.fireTimer >= RANGED_FIRE_INTERVAL) {
+                p.fireTimer = 0.0f;
+                float aspect = (float)GameConfig::WINDOW_HEIGHT / GameConfig::WINDOW_WIDTH;
+                PlayerProjectile b;
+                b.x = p.x + 0.03f * aspect;                                  // just in front of the head
+                b.y = GameConfig::LANE_CENTER_Y[p.lane] + p.yOffset + 0.07f; // head height
+                b.lane = p.lane;
+                b.damage = 1;
+                b.alive = true;
+                b.hitting = false;
+                b.hitTimer = 0.0f;
+                playerProjectiles.push_back(b);
+            }
         }
 
         if (p.action != PlayerAction::None) {
@@ -345,6 +522,32 @@ void playersUpdate(float dt) {
             players.erase(players.begin() + i);
         }
     }
+
+    // R3.15: move the balls, play the hit effect, then remove them
+    for (PlayerProjectile& b : playerProjectiles) {
+        if (b.hitting) {
+            b.hitTimer += dt;
+            if (b.hitTimer >= HIT_EFFECT_TIME) {
+                b.alive = false;                     // vanishes after the hit effect
+            }
+            continue;
+        }
+
+        b.x += PROJECTILE_SPEED * dt;                // moves right, stays in its lane
+
+        // R3.16 (with M4): if an enemy in b.lane is touched here -> damage it by b.damage, then b.hitting = true
+
+        // TEMPORARY TEST until the M4 link: hitting the right edge plays the hit effect so you can see it
+        if (b.x >= GameConfig::PLAYFIELD_RIGHT - 0.03f) {
+            b.hitting = true;
+        }
+    }
+
+    for (int i = (int)playerProjectiles.size() - 1; i >= 0; i--) {
+        if (!playerProjectiles[i].alive) {
+            playerProjectiles.erase(playerProjectiles.begin() + i);
+        }
+    }
 }
 
 void playersDraw() {
@@ -359,15 +562,40 @@ void playersDraw() {
         }
         glUniform1f(playerDamageLocation, damage);
 
+        float swing = sin(p.animTimer * WALK_SWING_SPEED) * WALK_SWING_ANGLE;   // R3.5
+
         if (p.type == PlayerType::Melee) {
-            drawMeleePlayer(p.x, y);
+            float armAngle = MELEE_HOLD_ANGLE;   // walking: weapon held still
+            if (p.inCombat) {
+                // R3.6: swing starts raised (70) and strikes down (-20), again and again
+                armAngle = MELEE_SWING_CENTER + cos(p.swingTimer * MELEE_SWING_SPEED) * MELEE_SWING_RANGE;
+            }
+            drawMeleePlayer(p.x, y, swing, armAngle);
         }
         else if (p.type == PlayerType::Ranged) {
-            drawRangedPlayer(p.x, y);
+            // R3.7: header animation right after firing, then a new ball drops back onto the head
+            float nod = 0.0f;
+            float ballLift = 0.0f;
+            bool showBall = true;
+            if (p.fireTimer < RANGED_FIRE_ANIM) {
+                nod = sin(p.fireTimer / RANGED_FIRE_ANIM * 3.14159f);   // 0 -> 1 -> 0
+                showBall = false;                                       // the ball just left
+            }
+            else if (p.fireTimer < RANGED_FIRE_ANIM + RANGED_RELOAD_ANIM) {
+                float t = (p.fireTimer - RANGED_FIRE_ANIM) / RANGED_RELOAD_ANIM;
+                ballLift = 0.05f * (1.0f - t);                          // new ball falls back onto the head
+            }
+            drawRangedPlayer(p.x, y, swing, nod, ballLift, showBall);
         }
         else {
             drawDefensePlayer(p.x, y);
         }
+    }
+
+    // R3.15: the balls fired by ranged players (never tinted red)
+    glUniform1f(playerDamageLocation, 0.0f);
+    for (const PlayerProjectile& b : playerProjectiles) {
+        drawPlayerProjectile(b);
     }
 
     glBindVertexArray(0);
@@ -380,6 +608,7 @@ void playersDraw() {
 
 void playersReset() {
     players.clear();
+    playerProjectiles.clear();
     jumpKeyWasPressed = false;
     duckKeyWasPressed = false;
 }
