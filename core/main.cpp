@@ -329,7 +329,15 @@ int main()
             );
                 playersDraw();
 
-                cutsceneAttackerX -= 0.35f * deltaTime;
+                if (cutsceneAttackerX > 0.4f)
+                    {
+                        cutsceneAttackerX -= 0.35f * deltaTime;
+
+                        if (cutsceneAttackerX < 0.4f)
+                        {
+                            cutsceneAttackerX = 0.4f;
+                        }
+                    }
 
                 drawHardEnemy(cutsceneAttackerX, 0.0f, 1.0f, false);
         }
