@@ -11,3 +11,5 @@ void playersInit() ;
 void playersUpdate(float dt);
 void playersDraw();
 void playersReset();
+void jumpLane(int lane);
+void duckLane(int lane);
