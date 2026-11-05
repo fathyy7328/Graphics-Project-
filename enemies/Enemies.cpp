@@ -62,7 +62,7 @@ static std::vector<enemy> enemies;
 static float spawnTimer = 0.0f;
 static const float spawnInterval = 2.0f;
 static const float ENEMY_SPEED = 0.2f;
-static int currentWave = 1; //test
+static int currentWave = 2; //test
 static int spawnedEnemies = 0;
 static const int waves[] = { 3, 5, 11 }; //test
 static bool gameLost = false;
@@ -305,16 +305,23 @@ void drawMediumEnemy(float x, float y, float animTime, bool attacking){
 
 void drawHardEnemy(float x, float y, float animTime, bool attacking){
     glUseProgram(enemyShaderProgram);
+    float swing = sin(animTime * 14.0f) * 15.0f;
+    float backAngle = 45.0f + swing;
+    float frontAngle = -40.0f - swing;
+    float backFootX = sin(glm::radians(backAngle)) * 0.08f;
+    float backFootY = cos(glm::radians(backAngle)) * 0.08f;
+    float frontFootX = sin(glm::radians(frontAngle)) * 0.08f;
+    float frontFootY = cos(glm::radians(frontAngle)) * 0.08f;
     drawPart(Shape::Square, x, y, 0.075f, 0.05f, 0.04f, 0.004f, 0.0f, 0.95f, 0.95f, 0.95f); // speed line 1
     drawPart(Shape::Square, x, y, 0.085f, 0.02f, 0.04f, 0.004f, 0.0f, 0.95f, 0.95f, 0.95f); // speed line 2
     drawPart(Shape::Square, x, y, 0.075f, -0.01f, 0.04f, 0.004f, 0.0f, 0.95f, 0.95f, 0.95f); // speed line 3
     drawPart(Shape::Square, x, y, -0.005f, 0.045f, 0.016f, 0.045f, 115.0f, 0.08f, 0.16f, 0.42f); // back upper arm
     drawPart(Shape::Square, x, y, 0.025f, 0.037f, 0.014f, 0.04f, 30.0f, 0.54f, 0.35f, 0.24f); // back forearm
     drawPart(Shape::Circle, x, y, 0.035f, 0.02f, 0.016f, 0.016f, 0.0f, 0.54f, 0.35f, 0.24f); // back hand
-    drawPart(Shape::Square, x, y, 0.028f, -0.063f, 0.022f, 0.08f, 45.0f, 0.64f, 0.07f, 0.23f); // back leg
-    drawPart(Shape::Square, x, y, 0.058f, -0.094f, 0.036f, 0.016f, 30.0f, 1.0f, 0.23f, 0.19f); // back boot
-    drawPart(Shape::Square, x, y, -0.026f, -0.066f, 0.022f, 0.08f, -40.0f, 0.64f, 0.07f, 0.23f); // front leg
-    drawPart(Shape::Square, x, y, -0.056f, -0.098f, 0.036f, 0.016f, 0.0f, 1.0f, 0.23f, 0.19f); // front boot
+    drawLimb(Shape::Square, x, y, 0.0f, -0.035f, 0.022f, 0.08f, backAngle, 0.64f, 0.07f, 0.23f); // back leg
+    drawPart(Shape::Square, x, y, backFootX, -0.035f - backFootY, 0.036f, 0.016f, backAngle - 15.0f, 1.0f, 0.23f, 0.19f); // back boot
+    drawLimb(Shape::Square, x, y, 0.0f, -0.035f, 0.022f, 0.08f, frontAngle, 0.64f, 0.07f, 0.23f); // front leg
+    drawPart(Shape::Square, x, y, frontFootX, -0.035f - frontFootY, 0.036f, 0.016f, frontAngle - 15.0f, 1.0f, 0.23f, 0.19f); // front boot
     drawPart(Shape::Square, x, y, -0.002f, -0.03f, 0.06f, 0.03f, 20.0f, 0.11f, 0.24f, 0.56f); // shorts
     drawPart(Shape::Square, x, y, -0.017f, 0.012f, 0.062f, 0.075f, 20.0f, 0.11f, 0.24f, 0.56f); // torso
     drawPart(Shape::Square, x, y, -0.036f, 0.005f, 0.01f, 0.075f, 20.0f, 0.64f, 0.07f, 0.23f); // stripe 1
