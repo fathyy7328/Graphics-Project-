@@ -37,6 +37,7 @@ struct Player {
     float animTimer;     // R3.5: drives the walking leg swing
     float swingTimer;    // R3.6: drives the melee weapon swing
     bool inCombat;       // R3.6 / R3.12: true while fighting an enemy
+    int strikesDone;     // R3.16: how many melee swings have already dealt damage
     float fireTimer;     // R3.7 / R3.15: time since the ranged player last fired
 };
 
@@ -370,6 +371,7 @@ void spawnPlayer(PlayerType type, int lane) {
     p.animTimer = 0.0f;
     p.swingTimer = 0.0f;
     p.inCombat = false;
+    p.strikesDone = 0;
     p.fireTimer = RANGED_FIRE_ANIM + RANGED_RELOAD_ANIM;   // start with the ball resting on the head
 
     if (type == PlayerType::Melee) {
@@ -403,6 +405,45 @@ void duckLane(int lane) {
             p.actionTimer = 0.0f;
         }
     }
+}
+
+// ---------- called by M4 (declared in Common.h) ----------
+
+// Is any living player in this lane close to x? M4 uses it so enemies stop at players (R4.20).
+bool isPlayerAt(int lane, float x) {
+    for (Player& p : players) {
+        if (p.lane == lane && p.health > 0 && fabs(p.x - x) <= 0.05f) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// An enemy attack reaches x in this lane. Returns true if a player was hit, false if it missed or was dodged.
+bool hitPlayer(int lane, float x, int damage, AttackHeight height) {
+    // the RIGHTMOST player close to x takes the hit: a Defense standing in front protects the players behind it
+    Player* target = nullptr;
+    for (Player& p : players) {
+        if (p.lane == lane && p.health > 0 && fabs(p.x - x) <= 0.05f) {
+            if (target == nullptr || p.x > target->x) {
+                target = &p;
+            }
+        }
+    }
+    if (target == nullptr) {
+        return false;                                    // nobody there
+    }
+
+    // dodges: duck under high attacks, jump over low attacks (Defense never jumps or ducks, melee can't be dodged)
+    if (height == AttackHeight::High && target->action == PlayerAction::Ducking) {
+        return false;
+    }
+    if (height == AttackHeight::Low && target->action == PlayerAction::Jumping) {
+        return false;
+    }
+
+    target->health -= damage;                            // R3.19 tint and R3.20 removal follow automatically
+    return true;
 }
 
 void playersInit() {
@@ -455,7 +496,11 @@ void playersUpdate(float dt) {
     for (Player& p : players) {
         float oldX = p.x;
 
-        if (p.type != PlayerType::Defense) {
+        // R3.12: is an enemy touching this player? (M4's isEnemyAt)
+        p.inCombat = isEnemyAt(p.lane, p.x);
+
+        // R3.9 / R3.12: walk right, but stop and fight while touching an enemy
+        if (p.type != PlayerType::Defense && !p.inCombat) {
             p.x += p.speed * dt;
         }
 
@@ -469,17 +514,25 @@ void playersUpdate(float dt) {
             p.animTimer += dt;
         }
 
-        // TEMPORARY TEST until R3.12: a player that reached the right edge counts as "in combat".
-        // R3.12 will replace this with: in combat = touching an enemy in the same lane.
-        p.inCombat = (p.x >= maxX);
-
         // R3.6: the melee weapon swings only during combat; otherwise the arm stays still
         if (p.type == PlayerType::Melee && p.inCombat) {
             p.swingTimer += dt;
+
+            // R3.16: 1 damage each time the swing reaches the bottom (once per swing, not every frame)
+            float phase = p.swingTimer * MELEE_SWING_SPEED;
+            int strikes = (int)((phase + 3.14159f) / (2.0f * 3.14159f));
+            if (strikes > p.strikesDone) {
+                p.strikesDone = strikes;
+                hitEnemy(p.lane, p.x, 1);
+            }
         }
         else {
             p.swingTimer = 0.0f;
+            p.strikesDone = 0;
         }
+
+        // R3.21: a player touching a dropped coin collects it (M4's function adds the coins)
+        collectCoinsAt(p.lane, p.x);
 
         // R3.7 / R3.15 / R3.9: the ranged player fires a ball every RANGED_FIRE_INTERVAL seconds, enemy or not
         if (p.type == PlayerType::Ranged) {
@@ -535,11 +588,13 @@ void playersUpdate(float dt) {
 
         b.x += PROJECTILE_SPEED * dt;                // moves right, stays in its lane
 
-        // R3.16 (with M4): if an enemy in b.lane is touched here -> damage it by b.damage, then b.hitting = true
-
-        // TEMPORARY TEST until the M4 link: hitting the right edge plays the hit effect so you can see it
-        if (b.x >= GameConfig::PLAYFIELD_RIGHT - 0.03f) {
+        // R3.15 / R3.16: touching an enemy in the same lane -> 1 damage, then play the hit effect
+        if (hitEnemy(b.lane, b.x, b.damage)) {
             b.hitting = true;
+        }
+        // off the right side of the field without hitting anything -> just vanish
+        else if (b.x > GameConfig::PLAYFIELD_RIGHT) {
+            b.alive = false;
         }
     }
 

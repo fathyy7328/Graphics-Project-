@@ -498,15 +498,17 @@ void updateEnemyPosition(float deltaTime) {
 
         //if (enemy.x <= 0.0f) enemy.health = 0;   // TEST
 
-        if (false) {   // test wait for hamed: if (enemy.type == enemyType::Hard && isPlayerAt(enemy.lane, enemy.x))   
+        bool playerHere = isPlayerAt(enemy.lane, enemy.x);   // every enemy type stops when it touches a player
+
+        if (enemy.type == enemyType::Hard && playerHere) {
             enemy.attackTimer += deltaTime;
             if (enemy.attackTimer >= ATTACK_INTERVAL) {
                 enemy.attackTimer = 0.0f;
                 enemy.attackAnim = 0.3f;
-                // test wait for hamed: hitPlayer(enemy.lane, enemy.x, 2, AttackHeight::Melee);   
+                hitPlayer(enemy.lane, enemy.x, 2, AttackHeight::Melee);
             }
         }
-        else {
+        else if (!playerHere) {
             enemy.x -= enemy.speed * deltaTime;
         }
 
@@ -536,7 +538,10 @@ void updateEnemyPosition(float deltaTime) {
         if (!proj.alive) continue;
         proj.x -= proj.speed * deltaTime;
 
-        //Test, do when hamed push
+        if (hitPlayer(proj.lane, proj.x, proj.damage, proj.height)) {   // hit a player (misses if dodged)
+            proj.alive = false;
+            continue;
+        }
 
         if (proj.x <= GameConfig::HOME_BASE_RIGHT) {
             proj.alive = false;
@@ -603,7 +608,7 @@ bool hitEnemy(int lane, float x, int damage){
     return false;
 }
 
-void collectedCoinsAt(int lane, float x){
+void collectCoinsAt(int lane, float x){
     for (auto& coin : droppedCoins){
         if (!coin.alive) continue;
         if (coin.lane == lane && fabs(coin.x - x) <= 0.05f) {
