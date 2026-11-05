@@ -13,6 +13,13 @@ enum class GAME_STATE {
     Lose
 };
 
+enum class AttackHeight { High, Low, Melee };
+bool hitPlayer(int lane, float x, int damage, AttackHeight height);   
+bool isPlayerAt(int lane, float x);                                   
+bool hitEnemy(int lane, float x, int damage);                         
+bool isEnemyAt(int lane, float x);                                    
+void collectCoinsAt(int lane, float x);                               
+
 // The current screen. Member 1 creates it in core/main.cpp; other modules can read it.
 extern GAME_STATE G_STATE;
 
