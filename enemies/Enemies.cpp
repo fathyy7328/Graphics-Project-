@@ -476,7 +476,7 @@ void updateEnemyPosition(float deltaTime) {
             gameLost = true;  //Test
             std::cout << "Game Over!" << std::endl;  //Test
             G_STATE = GAME_STATE::Lose; //Test
-            //enemy.alive = false;  //Test
+            enemy.alive = false;  //Test
 
         }
 
