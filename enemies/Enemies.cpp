@@ -42,11 +42,13 @@ struct projectile {
     float speed;
     int damage;
     bool alive;
+    AttackHeight height;
 };
 
 struct droppedCoin{
     float x;
     float y;
+    int lane;
     float timer;
     bool alive;
 };
@@ -69,7 +71,6 @@ static const int waves[] = { 3, 5, 11 }; //test
 static bool gameLost = false;
 static const float ATTACK_INTERVAL = 3.0f;
 static std::vector<projectile> projectiles;
-static const float FAKE_PLAYER_X = GameConfig::PLAYER_START_X; //fake player test
 static std::vector<droppedCoin> droppedCoins;
 
 
@@ -486,7 +487,7 @@ void updateEnemyPosition(float deltaTime) {
         
         if (enemy.health <= 0) {
             enemy.alive = false;
-            droppedCoins.push_back({enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], 0.0f, true});
+            droppedCoins.push_back({enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], enemy.lane, 0.0f, true});
             std::cout << "Enemy in lane " << enemy.lane << " defeated" << std::endl;
             continue;
         }
@@ -497,13 +498,12 @@ void updateEnemyPosition(float deltaTime) {
 
         //if (enemy.x <= 0.0f) enemy.health = 0;   // TEST
 
-        //hard test
-        if (enemy.type == enemyType::Hard && enemy.x - FAKE_PLAYER_X <= 0.05f) {
+        if (false) {   // test wait for hamed: if (enemy.type == enemyType::Hard && isPlayerAt(enemy.lane, enemy.x))   
             enemy.attackTimer += deltaTime;
             if (enemy.attackTimer >= ATTACK_INTERVAL) {
                 enemy.attackTimer = 0.0f;
                 enemy.attackAnim = 0.3f;
-                std::cout << "Player in lane " << enemy.lane << " hit for 2" << std::endl;
+                // test wait for hamed: hitPlayer(enemy.lane, enemy.x, 2, AttackHeight::Melee);   
             }
         }
         else {
@@ -525,9 +525,9 @@ void updateEnemyPosition(float deltaTime) {
                 enemy.attackTimer = 0.0f;
                 enemy.attackAnim = 0.3f;
                 if (enemy.type == enemyType::Easy)
-                    projectiles.push_back({enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane] + 0.05f, enemy.lane, 0.5f, 1, true});
+                    projectiles.push_back({enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane] + 0.05f, enemy.lane, 0.5f, 1, true, AttackHeight::High});
                 else if (enemy.type == enemyType::Medium)
-                    projectiles.push_back({enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane] - 0.12f, enemy.lane, 0.5f, 1, true});
+                    projectiles.push_back({enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane] - 0.12f, enemy.lane, 0.5f, 1, true, AttackHeight::Low});
                 }
         } 
     }
@@ -536,12 +536,7 @@ void updateEnemyPosition(float deltaTime) {
         if (!proj.alive) continue;
         proj.x -= proj.speed * deltaTime;
 
-        //Fake Player test
-        if (proj.x <= FAKE_PLAYER_X) {
-            proj.alive = false;
-            std::cout << "Player in lane " << proj.lane << " hit for " << proj.damage << std::endl;
-            continue;
-        }
+        //Test, do when hamed push
 
         if (proj.x <= GameConfig::HOME_BASE_RIGHT) {
             proj.alive = false;
@@ -552,10 +547,8 @@ void updateEnemyPosition(float deltaTime) {
         if (!coin.alive) continue;
         coin.timer += 0.1f *deltaTime;
         coin.y += 0.01f * deltaTime; 
-        if (coin.timer >= 1.5f) {
-            addCoins(GameConfig::COIN_VALUE);
+        if (coin.timer >= 1.5f) 
             coin.alive = false;
-        }
     }
 
     bool anyAlive = false;
@@ -588,3 +581,36 @@ void resetEnemies() {
     projectiles.clear();
 }
 
+bool isEnemyAt(int lane, float x) {
+    for (auto& enemy : enemies){
+        if (!enemy.alive) continue;
+        if (enemy.lane == lane && fabs(enemy.x - x) <= 0.05f) {
+            return true;
+        }
+    }    
+    return false;
+}
+
+bool hitEnemy(int lane, float x, int damage){
+    for (auto& enemy : enemies){
+        if (!enemy.alive || enemy.health <= 0) continue;
+        if (enemy.lane == lane && fabs(enemy.x - x) <= 0.05f) {
+            enemy.health -= damage;
+            std::cout << "Enemy in lane " << lane << " hit for " << damage << ", remaining health: " << enemy.health << std::endl;
+            return true;
+        }
+    }
+    return false;
+}
+
+void collectedCoinsAt(int lane, float x){
+    for (auto& coin : droppedCoins){
+        if (!coin.alive) continue;
+        if (coin.lane == lane && fabs(coin.x - x) <= 0.05f) {
+            addCoins(GameConfig::COIN_VALUE);
+            coin.alive = false;
+            std::cout << "Collected coins at lane " << lane << ", x: " << x << std::endl;
+            return;
+        }
+    }
+}
