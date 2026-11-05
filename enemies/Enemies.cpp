@@ -62,9 +62,9 @@ static std::vector<enemy> enemies;
 static float spawnTimer = 0.0f;
 static const float spawnInterval = 2.0f;
 static const float ENEMY_SPEED = 0.2f;
-static int currentWave = 0;
+static int currentWave = 1; //test
 static int spawnedEnemies = 0;
-static const int waves[] = { 3, 5, 10 }; //test
+static const int waves[] = { 3, 5, 11 }; //test
 static bool gameLost = false;
 static const float ATTACK_INTERVAL = 3.0f;
 static std::vector<projectile> projectiles;
@@ -221,12 +221,39 @@ static void drawPart(Shape shape, float cx, float cy, float px, float py, float 
     }
 }
 
+static void drawLimb(Shape shape, float cx, float cy, float px, float py, float w, float h, float angle, float r, float g, float b){
+    float aspect = (float)GameConfig::WINDOW_HEIGHT / GameConfig::WINDOW_WIDTH;
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(cx, cy, 0.0f));
+    model = glm::scale(model, glm::vec3(aspect, 1.0f, 1.0f));
+    model = glm::translate(model, glm::vec3(px, py, 0.0f));
+    model = glm::rotate(model, glm::radians(angle), glm::vec3(0.0f, 0.0f, 1.0f));
+    model = glm::translate(model, glm::vec3(0.0f, -h/2.0f, 0.0f));
+    model = glm::scale(model, glm::vec3(w, h, 1.0f));
+    glUniformMatrix4fv(enemyTransformLocation, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform3f(enemyColorLocation, r, g, b);
+    if (shape == Shape::Square) {
+        glBindVertexArray(squareVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+    } else if (shape == Shape::Circle) {
+        glBindVertexArray(circleVAO);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, circleVertexCount);
+    } else if (shape == Shape::Triangle) {
+        glBindVertexArray(triangleVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+    }
+}
+
 void drawEasyEnemy(float x, float y, float animTime, bool attacking){
     glUseProgram(enemyShaderProgram);
-    drawPart(Shape::Square, x, y, -0.015f, -0.08f, 0.02f, 0.08f, 0.0f, 0.78f, 0.88f, 0.23f); // left leg
-    drawPart(Shape::Square, x, y, 0.015f, -0.08f, 0.02f, 0.08f, 0.0f, 0.78f, 0.88f, 0.23f); // right leg
-    drawPart(Shape::Square, x, y, -0.018f, -0.125f, 0.032f, 0.015f, 0.0f, 0.07f, 0.07f, 0.07f); // left boot
-    drawPart(Shape::Square, x, y, 0.012f, -0.125f, 0.032f, 0.015f, 0.0f, 0.07f, 0.07f, 0.07f); // right boot
+    float swing = sin(animTime *6.0f) * 20.0f;
+    float rad = glm::radians(swing);
+    float footX = sin(rad) * 0.08f;
+    float footY = cos(rad) * 0.08f;
+    drawLimb(Shape::Square, x, y, -0.015f, -0.04f, 0.02f, 0.08f, swing, 0.78f, 0.88f, 0.23f); // left leg
+    drawLimb(Shape::Square, x, y, 0.015f, -0.04f, 0.02f, 0.08f, -swing, 0.78f, 0.88f, 0.23f); // right leg
+    drawPart(Shape::Square, x, y, -0.015f + footX, -0.04f - footY, 0.032f, 0.015f, swing, 0.07f, 0.07f, 0.07f); // left boot
+    drawPart(Shape::Square, x, y, 0.015f - footX, -0.04f - footY, 0.032f, 0.015f, -swing, 0.07f, 0.07f, 0.07f); // right boot
     drawPart(Shape::Square, x, y, 0.0f, -0.035f, 0.06f, 0.03f, 0.0f, 0.12f, 0.16f, 0.27f); // shorts
     drawPart(Shape::Square, x, y, 0.0f, 0.01f, 0.06f, 0.07f, 0.0f, 0.78f, 0.88f, 0.23f); // torso
     drawPart(Shape::Square, x, y, 0.0f, 0.03f, 0.06f, 0.006f, 0.0f, 0.24f, 0.29f, 0.10f); // chest stripe
@@ -244,12 +271,18 @@ void drawEasyEnemy(float x, float y, float animTime, bool attacking){
 
 void drawMediumEnemy(float x, float y, float animTime, bool attacking){
     glUseProgram(enemyShaderProgram);
-    drawPart(Shape::Square, x, y, -0.014f, -0.08f, 0.02f, 0.08f, 0.0f, 0.64f, 0.07f, 0.23f); // left leg
-    drawPart(Shape::Square, x, y, 0.014f, -0.08f, 0.02f, 0.08f, 0.0f, 0.64f, 0.07f, 0.23f); // right leg
-    drawPart(Shape::Square, x, y, -0.014f, -0.095f, 0.024f, 0.03f, 0.0f, 0.94f, 0.94f, 0.94f); // left shin guard
-    drawPart(Shape::Square, x, y, 0.014f, -0.095f, 0.024f, 0.03f, 0.0f, 0.94f, 0.94f, 0.94f); // right shin guard
-    drawPart(Shape::Square, x, y, -0.019f, -0.125f, 0.034f, 0.015f, 0.0f, 0.95f, 0.76f, 0.0f); // left boot
-    drawPart(Shape::Square, x, y, 0.009f, -0.125f, 0.034f, 0.015f, 0.0f, 0.95f, 0.76f, 0.0f); // right boot
+    float swing = sin(animTime *6.0f) * 20.0f;
+    float rad = glm::radians(swing);
+    float footX = sin(rad) * 0.08f;
+    float footY = cos(rad) * 0.08f;
+    float shinX = sin(rad) * 0.055f;
+    float shinY = cos(rad) * 0.055f;
+    drawLimb(Shape::Square, x, y, -0.014f, -0.04f, 0.02f, 0.08f, swing, 0.64f, 0.07f, 0.23f); // left leg
+    drawLimb(Shape::Square, x, y, 0.014f, -0.04f, 0.02f, 0.08f, -swing, 0.64f, 0.07f, 0.23f); // right leg
+    drawPart(Shape::Square, x, y, -0.014f + shinX, -0.04f - shinY, 0.024f, 0.03f, swing, 0.94f, 0.94f, 0.94f); // left shin guard
+    drawPart(Shape::Square, x, y, 0.014f - shinX, -0.04f - shinY, 0.024f, 0.03f, -swing, 0.94f, 0.94f, 0.94f); // right shin guard
+    drawPart(Shape::Square, x, y, -0.014f + footX, -0.04f - footY, 0.034f, 0.015f, 0.0f, 0.95f, 0.76f, 0.0f); // left boot
+    drawPart(Shape::Square, x, y, 0.014f - footX, -0.04f - footY, 0.034f, 0.015f, 0.0f, 0.95f, 0.76f, 0.0f); // right boot
     drawPart(Shape::Square, x, y, 0.0f, -0.03f, 0.058f, 0.03f, 0.0f, 0.11f, 0.24f, 0.56f); // shorts
     drawPart(Shape::Square, x, y, 0.0f, 0.015f, 0.058f, 0.07f, 0.0f, 0.11f, 0.24f, 0.56f); // torso
     drawPart(Shape::Square, x, y, -0.018f, 0.015f, 0.009f, 0.07f, 0.0f, 0.64f, 0.07f, 0.23f); // stripe 1
@@ -317,6 +350,8 @@ void drawTriangle(){
         drawPart(Shape::Circle, coin.x, coin.y, 0, 0, 0.036f, 0.036f, 0, 0.90f, 0.72f, 0.20f);
     }
 
+    float t = (float)glfwGetTime();
+
     for (auto& enemy : enemies) {
         if (!enemy.alive) continue;
         
@@ -326,11 +361,11 @@ void drawTriangle(){
         glUseProgram(enemyShaderProgram);
         glUniform1f(enemyDamageLocation, damage);
         if (enemy.type == enemyType::Easy)
-            drawEasyEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], 0.0f, false);        
+            drawEasyEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], t, false);        
         else if (enemy.type == enemyType::Medium)
-            drawMediumEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], 0.0f, false);
+            drawMediumEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], t, false);
         else
-            drawHardEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], 0.0f, false);    
+            drawHardEnemy(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane], t, false);    
         drawHealthBar(enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane] + 0.13f, enemy.health, enemy.maxHealth);        
     }
 }
@@ -469,6 +504,7 @@ void updateEnemyPosition(float deltaTime) {
     for (auto& coin : droppedCoins) {
         if (!coin.alive) continue;
         coin.timer += 0.1f *deltaTime;
+        coin.y += 0.01f * deltaTime; 
         if (coin.timer >= 1.5f) {
             addCoins(GameConfig::COIN_VALUE);
             coin.alive = false;
