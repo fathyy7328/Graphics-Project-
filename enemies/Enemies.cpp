@@ -63,13 +63,13 @@ static GLint enemyColorLocation = -1;
 static GLint enemyDamageLocation = -1;
 static std::vector<enemy> enemies;
 static float spawnTimer = 0.0f;
-static const float spawnInterval = 2.0f;
-static const float ENEMY_SPEED = 0.1f;
-static int currentWave = 0; //test
+static const float spawnInterval = 4.0f;
+static const float ENEMY_SPEED = 0.08f;
+static int currentWave = 0; 
 static int spawnedEnemies = 0;
-static const int waves[] = { 3, 5, 11 }; //test
+static const int waves[] = { 3, 5, 11 }; 
 static bool gameLost = false;
-static const float ATTACK_INTERVAL = 3.0f;
+static const float ATTACK_INTERVAL = 5.0f;
 static std::vector<projectile> projectiles;
 static std::vector<droppedCoin> droppedCoins;
 
@@ -343,7 +343,7 @@ void drawHardEnemy(float x, float y, float animTime, bool attacking){
     float backFootX = sin(glm::radians(backAngle)) * 0.08f;
     float backFootY = cos(glm::radians(backAngle)) * 0.08f;
     float frontFootX = sin(glm::radians(frontAngle)) * 0.08f;
-float frontFootY = cos(glm::radians(frontAngle)) * 0.08f;
+    float frontFootY = cos(glm::radians(frontAngle)) * 0.08f;
     drawPart(Shape::Square, x, y, 0.075f, 0.05f, 0.04f, 0.004f, 0.0f, 0.95f, 0.95f, 0.95f); // speed line 1
     drawPart(Shape::Square, x, y, 0.085f, 0.02f, 0.04f, 0.004f, 0.0f, 0.95f, 0.95f, 0.95f); // speed line 2
     drawPart(Shape::Square, x, y, 0.075f, -0.01f, 0.04f, 0.004f, 0.0f, 0.95f, 0.95f, 0.95f); // speed line 3
@@ -375,7 +375,6 @@ float frontFootY = cos(glm::radians(frontAngle)) * 0.08f;
 void drawTriangle(){
     glUseProgram(enemyShaderProgram);
     
-    glUseProgram(enemyShaderProgram);
     glUniform1f(enemyDamageLocation, 0.0f);
     for (auto& proj : projectiles) {
         if (!proj.alive) continue;
@@ -416,7 +415,7 @@ void spawnEnemy() {
     newEnemy.speed = ENEMY_SPEED;
     newEnemy.alive = true;
     newEnemy.attackTimer = ATTACK_INTERVAL; 
-    spawnEnemy: newEnemy.attackAnim = 0.0f;
+    newEnemy.attackAnim = 0.0f;
 
     if (currentWave == 0){
         newEnemy.type = enemyType::Easy;
@@ -496,7 +495,6 @@ void updateEnemyPosition(float deltaTime) {
             enemy.attackAnim -= deltaTime;
         }
 
-        //if (enemy.x <= 0.0f) enemy.health = 0;   // TEST
 
         bool playerHere = isPlayerAt(enemy.lane, enemy.x);   // every enemy type stops when it touches a player
 
@@ -515,9 +513,8 @@ void updateEnemyPosition(float deltaTime) {
 
         if (enemy.x <= GameConfig::HOME_BASE_RIGHT) {
             gameLost = true;  //Test
-            std::cout << "Game Over!" << std::endl;  //Test
-            G_STATE = GAME_STATE::Lose; //Test
-            enemy.alive = false;  //Test
+            std::cout << "Game Over!" << std::endl;  
+            G_STATE = GAME_STATE::Lose; 
 
         }
 
@@ -527,9 +524,9 @@ void updateEnemyPosition(float deltaTime) {
                 enemy.attackTimer = 0.0f;
                 enemy.attackAnim = 0.3f;
                 if (enemy.type == enemyType::Easy)
-                    projectiles.push_back({enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane] + 0.05f, enemy.lane, 0.5f, 1, true, AttackHeight::High});
+                    projectiles.push_back({enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane] + 0.05f, enemy.lane, 0.25f, 1, true, AttackHeight::High});
                 else if (enemy.type == enemyType::Medium)
-                    projectiles.push_back({enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane] - 0.12f, enemy.lane, 0.5f, 1, true, AttackHeight::Low});
+                    projectiles.push_back({enemy.x, GameConfig::LANE_CENTER_Y[enemy.lane] - 0.12f, enemy.lane, 0.25f, 1, true, AttackHeight::Low});
                 }
         } 
     }
@@ -569,7 +566,7 @@ void updateEnemyPosition(float deltaTime) {
             std::cout << "Wave " << currentWave + 1 << " starting" << std::endl;        
         } else {
             std::cout << "All waves cleared" << std::endl;  
-            G_STATE = GAME_STATE::Win; //TEST
+            G_STATE = GAME_STATE::Win;
         }
         spawnedEnemies = 0;
         spawnTimer = 0.0f;

@@ -55,7 +55,7 @@ inline constexpr int MELEE_COST = 10;
 inline constexpr int RANGED_COST = 20;
 inline constexpr int DEFENSE_COST = 30;
 inline constexpr int STARTING_COINS = 30;
-inline constexpr int COIN_VALUE = 5; // coins given by one collectible
+inline constexpr int COIN_VALUE = 10; // coins given by one collectible
 
 } 
 // call it after drawing the character so the bar shows on top
