@@ -194,6 +194,7 @@ int main()
     // render loop
     // -----------
     double previousTime = glfwGetTime();
+    float cutsceneAttackerX = 0.8f;
     while (!glfwWindowShouldClose(window))
     {
         // input
@@ -289,11 +290,11 @@ int main()
 
         }
         if (G_STATE == GAME_STATE::Cutscene)
-        {
+        {   
             drawBackground();
             drawDecorations();
             drawHomeBase();
-
+            
             
             RenderText(
                 textShader,
@@ -326,6 +327,11 @@ int main()
                 0.7f,
                 glm::vec3(1.0f, 1.0f, 1.0f)
             );
+                playersDraw();
+
+                cutsceneAttackerX -= 0.35f * deltaTime;
+
+                drawHardEnemy(cutsceneAttackerX, 0.0f, 1.0f, false);
         }
             if (G_STATE == GAME_STATE::Paused)
         {
