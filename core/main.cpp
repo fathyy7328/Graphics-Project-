@@ -195,6 +195,8 @@ int main()
     // -----------
     double previousTime = glfwGetTime();
     float cutsceneAttackerX = 0.8f;
+    float cutsceneContactTimer = 0.0f;
+    bool cutsceneAttackerPushedBack = false;
     while (!glfwWindowShouldClose(window))
     {
         // input
@@ -276,6 +278,7 @@ int main()
             ;
           
         }
+        
         if (G_STATE == GAME_STATE::Playing)
           { 
             updateEnemyPosition(deltaTime);
@@ -327,19 +330,35 @@ int main()
                 0.7f,
                 glm::vec3(1.0f, 1.0f, 1.0f)
             );
-                playersDraw();
+            playersDraw();
 
-                if (cutsceneAttackerX > 0.4f)
+            if (!cutsceneAttackerPushedBack)
+            {
+                cutsceneAttackerX -= 0.35f * deltaTime;
+
+                if (cutsceneAttackerX <= -0.15f)
+                {
+                    cutsceneAttackerX = -0.15f;
+                    cutsceneContactTimer += deltaTime;
+
+                    if (cutsceneContactTimer >= 0.3f)
                     {
-                        cutsceneAttackerX -= 0.35f * deltaTime;
-
-                        if (cutsceneAttackerX < 0.4f)
-                        {
-                            cutsceneAttackerX = 0.4f;
-                        }
+                        cutsceneAttackerPushedBack = true;
                     }
+                }
+            }
+            else if (cutsceneAttackerX < 0.0f)
+            {
+                cutsceneAttackerX += 0.5f * deltaTime;
 
-                drawHardEnemy(cutsceneAttackerX, 0.0f, 1.0f, false);
+                if (cutsceneAttackerX > 0.0f)
+                {
+                    cutsceneAttackerX = 0.0f;
+                }
+            }
+
+            const bool attackerAtDefender = cutsceneContactTimer > 0.0f && !cutsceneAttackerPushedBack;
+            drawHardEnemy(cutsceneAttackerX, 0.0f, static_cast<float>(currentTime), attackerAtDefender);
         }
             if (G_STATE == GAME_STATE::Paused)
         {
@@ -427,6 +446,7 @@ void Open_Cutscene(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS && G_STATE == GAME_STATE::Main_Menu)
     {
         G_STATE = GAME_STATE::Cutscene;
+        spawnPlayer(PlayerType::Defense, 1);
     }
     double cursorX = 0.0;
     double cursorY = 0.0;
@@ -453,12 +473,13 @@ void Open_Cutscene(GLFWwindow *window)
         G_STATE == GAME_STATE::Main_Menu)
     {
         G_STATE = GAME_STATE::Cutscene;
+        spawnPlayer(PlayerType::Defense, 1);
     }
 }
 void Open_Playing(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && G_STATE == GAME_STATE::Cutscene)
-    {
+    {   playersReset();
         G_STATE = GAME_STATE::Playing;
     }
 }
