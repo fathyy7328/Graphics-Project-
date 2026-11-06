@@ -210,6 +210,17 @@ int main()
 
         Open_Cutscene(window);
         Open_Playing(window);
+        if ((G_STATE == GAME_STATE::Win || G_STATE == GAME_STATE::Lose) &&
+            glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS)
+        {
+            playersReset();
+            worldReset();
+            resetEnemies();
+            cutsceneAttackerX = 0.8f;
+            cutsceneContactTimer = 0.0f;
+            cutsceneAttackerPushedBack = false;
+            G_STATE = GAME_STATE::Playing;
+        }
         updateLanes(window);
         updateCards(window);
         if (G_STATE == GAME_STATE::Playing)
@@ -336,9 +347,9 @@ int main()
             {
                 cutsceneAttackerX -= 0.35f * deltaTime;
 
-                if (cutsceneAttackerX <= -0.15f)
+                if (cutsceneAttackerX <= -0.21f)
                 {
-                    cutsceneAttackerX = -0.15f;
+                    cutsceneAttackerX = -0.21f;
                     cutsceneContactTimer += deltaTime;
 
                     if (cutsceneContactTimer >= 0.3f)
@@ -391,9 +402,16 @@ int main()
             RenderText(
                 textShader,
                 "Congratulations! You won!",
-                190.0f, 300.0f,
-                0.85f,
+                165.0f, 470.0f,
+                1.0f,
                 glm::vec3(1.0f, 0.84f, 0.0f)
+            );
+            RenderText(
+                textShader,
+                "Press G to play again.",
+                250.0f, 410.0f,
+                0.75f,
+                glm::vec3(1.0f, 1.0f, 1.0f)
             );
         }
         if(G_STATE == GAME_STATE::Lose)
@@ -402,9 +420,16 @@ int main()
             RenderText(
                 textShader,
                 "You lost. Hard luck next time.",
-                165.0f, 300.0f,
-                0.75f,
+                130.0f, 470.0f,
+                1.0f,
                 glm::vec3(1.0f, 0.0f, 0.0f)
+            );
+            RenderText(
+                textShader,
+                "Press G to play again.",
+                250.0f, 410.0f,
+                0.75f,
+                glm::vec3(1.0f, 1.0f, 1.0f)
             );
         }
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
