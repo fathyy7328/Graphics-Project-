@@ -500,7 +500,7 @@ void updateEnemyPosition(float deltaTime) {
 
         if (enemy.type == enemyType::Hard && playerHere) {
             enemy.attackTimer += deltaTime;
-            if (enemy.attackTimer >= ATTACK_INTERVAL) {
+            if (enemy.attackTimer >= ATTACK_INTERVAL*2) {
                 enemy.attackTimer = 0.0f;
                 enemy.attackAnim = 0.3f;
                 hitPlayer(enemy.lane, enemy.x, 2, AttackHeight::Melee);
